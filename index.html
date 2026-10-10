@@ -139,11 +139,22 @@ a{color:var(--run)}
 
     <!-- ЗАМЕНЫ -->
     <section class="tab" id="tab-rep" hidden>
-      <h2>Замены Plan-Fact</h2>
+      <h2>Правки Plan-Fact</h2>
       <div class="card">
-        <label class="f" for="repTxt">Таблица замен (дата · было → стало · аналог)</label>
+        <label class="f" for="repTxt">Замены партий (дата · было → стало · аналог)</label>
         <textarea id="repTxt" placeholder="10.10  RBS1269+RBU1232 → RBB1093&#10;12.10  RAS2381 → RAN2435  RAN2432" spellcheck="false" autocapitalize="characters" autocorrect="off"></textarea>
         <div id="repParsed" class="hint" style="font-size:12.5px;color:var(--muted);margin-top:6px">Вставьте текст — замены распознаются автоматически.</div>
+      </div>
+      <div class="card">
+        <label class="f" for="repEdit">Другие правки Plan-Fact (по строке на правку)</label>
+        <div class="chips" id="repAdd" style="max-height:none;margin:0 0 8px">
+          <button type="button" class="chip" data-t="удалить ">+ Удалить партию</button>
+          <button type="button" class="chip" data-t="день ">+ Отменить день</button>
+          <button type="button" class="chip" data-t="линии ">+ Обмен линий A↔B</button>
+          <button type="button" class="chip" data-t="обмен ">+ Обмен местами</button>
+        </div>
+        <textarea id="repEdit" placeholder="удалить RAS2381 RBS1269&#10;день 15.10 B&#10;линии RAS2323 RKV2107&#10;обмен RAS2381 RAR2443" spellcheck="false" autocapitalize="off" autocorrect="off" style="min-height:100px"></textarea>
+        <div id="repEditParsed" class="hint" style="font-size:12.5px;color:var(--muted);margin-top:6px">«день 15.10» — все линии, «день 15.10 B» — только линия B (или вкладки: AS_in_A). «линии» — партия A-линии и партия B-линии меняются линиями.</div>
       </div>
       <div class="card">
         <label class="f" for="repSrc">Исходный Plan-Fact</label>
@@ -153,9 +164,9 @@ a{color:var(--run)}
         <label class="f" for="repFz">Freeze (до этой даты поставки не пересчитываются)</label>
         <input type="text" id="repFz" autocapitalize="off" autocorrect="off" spellcheck="false">
       </div>
-      <button class="btn" id="runRep" type="button">▶ Замены + пересчёт графиков</button>
-      <div class="grid2" style="margin-top:8px"><button class="btn sec" id="runRepOnly" type="button">Только замены</button><button class="btn sec" id="runRecalc" type="button">Только пересчёт</button></div>
-      <p class="hint" style="font-size:12.5px;color:var(--muted)">Таблица уходит в репозиторий, расчёт идёт в облаке. Новый Plan-Fact и графики появятся во вкладке «Файлы» (папки Plan-Fact и Графики_поставщиков). Исходный Plan-Fact не меняется.</p>
+      <button class="btn" id="runRep" type="button">▶ Применить + пересчитать графики</button>
+      <div class="grid2" style="margin-top:8px"><button class="btn sec" id="runRepOnly" type="button">Только применить</button><button class="btn sec" id="runRecalc" type="button">Только пересчёт</button></div>
+      <p class="hint" style="font-size:12.5px;color:var(--muted)">Замены и правки уходят в репозиторий, расчёт идёт в облаке. Новый Plan-Fact и графики появятся во вкладке «Файлы» (папки Plan-Fact и Графики_поставщиков). Исходный Plan-Fact не меняется.</p>
     </section>
 
     <!-- ФАЙЛЫ -->
@@ -447,25 +458,60 @@ function loadRepSrc(){
     var sel=$('repSrc'),cur=sel.value;sel.innerHTML='<option value="">самый новый plan_fact_all_*</option>'+names.map(function(n){return '<option>'+esc(n)+'</option>'}).join('');sel.value=cur;
   }).catch(function(){});
 }
+function parseEdits(t){
+  var ops=[],err=[],yr=new Date(Date.now()+3*3600000).getUTCFullYear(),idr=/R[A-Z]{2}\d{3,4}/g;
+  function iso(x){var m=x.match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$/);if(!m)return /^\d{4}-\d{2}-\d{2}$/.test(x)?x:null;
+    var y=m[3]?(m[3].length===2?2000+(+m[3]):+m[3]):yr;return y+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2)}
+  function lt(L){var r=[];['WELD','PAINT','AS'].forEach(function(s){['in','out'].forEach(function(io){r.push(s+'_'+io+'_'+L)})});return r}
+  String(t).replace(/\r/g,'').split('\n').forEach(function(raw,i){
+    var s=raw.trim();if(!s||s[0]==='#')return;var low=s.toLowerCase(),ids=s.toUpperCase().match(idr)||[],bad=function(m){err.push('Строка '+(i+1)+': '+m)};
+    if(/^(удал|delete|del)/.test(low)){if(!ids.length)return bad('не указана партия');ids.forEach(function(b){ops.push({op:'delete',batch:b})})}
+    else if(/^(лини|смен.*лини|обмен[\s-]*лини|cross)/.test(low)){if(ids.length!==2)return bad('нужны две партии (A- и B-линии)');ops.push({op:'crossswap',a:ids[0],b:ids[1]})}
+    else if(/^(обмен|swap|поменять)/.test(low)){if(ids.length!==2)return bad('нужны две партии');ops.push({op:'swap',a:ids[0],b:ids[1]})}
+    else if(/^(день|дни|отмен|cancel|day)/.test(low)){
+      var m=s.match(/\b(\d{1,2}\.\d{1,2}(?:\.\d{2,4})?|\d{4}-\d{2}-\d{2})\b/);if(!m)return bad('не найдена дата');
+      var d=iso(m[1]);if(!d)return bad('не разобрана дата');var op={op:'cancelday',date:d},rest=s.slice(m.index+m[0].length),tabs=rest.match(/(?:WELD|PAINT|AS)_(?:in|out)_[AB]/gi)||[];
+      if(!tabs.length){var seen={};(rest.toUpperCase().match(/(?:^|[^A-Za-zА-Яа-я0-9])([AB])(?![A-Za-z0-9])/g)||[]).forEach(function(x){var L=x.slice(-1);if(!seen[L]){seen[L]=1;tabs=tabs.concat(lt(L))}})}
+      if(tabs.length)op.tabs=tabs;ops.push(op)}
+    else bad('неизвестная операция (удалить / день / линии / обмен)');
+  });
+  return {ops:ops,err:err};
+}
+function descEdit(o){return o.op==='delete'?'удалить партию '+o.batch:o.op==='crossswap'?'обмен линий A↔B: '+o.a+' ↔ '+o.b:o.op==='swap'?'обмен местами: '+o.a+' ↔ '+o.b:'отмена дня '+o.date+(o.tabs?' ('+o.tabs.length+' вкл.)':' (все линии)')}
+function showEdit(){
+  var r=parseEdits($('repEdit').value),b=$('repEditParsed');
+  if(!$('repEdit').value.trim())b.textContent='«день 15.10» — все линии, «день 15.10 B» — только линия B (или вкладки: AS_in_A). «линии» — партия A-линии и партия B-линии меняются линиями.';
+  else b.innerHTML=(r.ops.length?'Правок: <b>'+r.ops.length+'</b><br>'+r.ops.map(function(o){return esc(descEdit(o))}).join('<br>'):'')+(r.err.length?'<br><span style="color:var(--bad)">'+r.err.map(esc).join('<br>')+'</span>':'');
+  ls('mrp_repEdit',$('repEdit').value);
+}
+$('repEdit').addEventListener('input',showEdit);
+document.querySelectorAll('#repAdd .chip').forEach(function(b){b.addEventListener('click',function(){var t=$('repEdit');t.value+=(t.value&&!/\n$/.test(t.value)?'\n':'')+b.dataset.t;t.focus();showEdit()})});
+function putOps(name,text){
+  var body={message:'ops: '+name,content:btoa(unescape(encodeURIComponent(text))),branch:INBOX_BRANCH};
+  return gh('/contents/ops/'+name+'?ref='+INBOX_BRANCH).catch(function(){return null}).then(function(ex){if(ex&&ex.sha)body.sha=ex.sha;return gh('/contents/ops/'+name,{method:'PUT',body:body})});
+}
 function runRep(kind){
   if(needCfg())return;
   var sup=[];document.querySelectorAll('#repSup .chip[aria-pressed="true"]').forEach(function(b){sup.push(b.dataset.s)});
-  var a=parseRep($('repTxt').value);
-  if(kind!=='recalc'&&!a.length){toast('Не распознано ни одной замены');return}
-  if(kind!=='replace'&&!sup.length){toast('Выберите поставщика');return}
+  var a=parseRep($('repTxt').value),e=parseEdits($('repEdit').value);
+  if(e.err.length){toast(e.err[0],6000);return}
+  if(kind!=='recalc'&&!a.length&&!e.ops.length){toast('Нет ни замен, ни правок');return}
+  if(kind!=='plan'&&!sup.length){toast('Выберите поставщика');return}
   if(S.activeRun){toast('Сейчас уже идёт прогон. Дождитесь окончания или отмените его.',4500);return}
-  var go=function(){dispatch({action:kind==='all'?'replace_recalc':kind,supplier:sup.join(','),graphs_week:S.week3,pf_src:$('repSrc').value,freeze:kind==='replace'?'':$('repFz').value.trim()},
-    kind==='recalc'?'пересчёт графиков':(kind==='replace'?'замены Plan-Fact':'замены + пересчёт'))};
+  var act=kind==='all'?'replace_recalc':kind==='plan'?'replace':'recalc';
+  var go=function(){dispatch({action:act,supplier:sup.join(','),graphs_week:S.week3,pf_src:$('repSrc').value,freeze:kind==='plan'?'':$('repFz').value.trim()},
+    kind==='recalc'?'пересчёт графиков':(kind==='plan'?'правки Plan-Fact':'правки + пересчёт'))};
   if(kind==='recalc')return go();
-  var csv=repCsv(a),body={message:'ops: таблица замен',content:btoa(unescape(encodeURIComponent('\ufeff'+csv))),branch:INBOX_BRANCH};
-  ensureBranch().then(function(){return gh('/contents/ops/replace_table.csv?ref='+INBOX_BRANCH).catch(function(){return null})}).then(function(ex){
-    if(ex&&ex.sha)body.sha=ex.sha;return gh('/contents/ops/replace_table.csv',{method:'PUT',body:body})
-  }).then(go).catch(function(e){toast('Таблица не загружена: '+e.message,6000)});
+  /* один файл: строки замен (дата;было;стало[;аналог]) + строки правок (удалить / день / линии / обмен) */
+  var edLines=$('repEdit').value.replace(/\r/g,'').split('\n').map(function(x){return x.trim()}).filter(function(x){return x&&x[0]!=='#'}).join('\n');
+  var spec='\ufeff'+repCsv(a)+(edLines?edLines+'\n':'');
+  ensureBranch().then(function(){return putOps('replace_table.csv',spec)}).then(go)
+   .catch(function(er){toast('Не загружено: '+er.message,6000)});
 }
 $('runRep').addEventListener('click',function(){runRep('all')});
-$('runRepOnly').addEventListener('click',function(){runRep('replace')});
+$('runRepOnly').addEventListener('click',function(){runRep('plan')});
 $('runRecalc').addEventListener('click',function(){runRep('recalc')});
-$('repFz').value=defFreeze();$('repTxt').value=ls('mrp_repTxt')||'';showRep();
+$('repFz').value=defFreeze();$('repTxt').value=ls('mrp_repTxt')||'';showRep();$('repEdit').value=ls('mrp_repEdit')||'';showEdit();
 
 /* ── Журнал ───────────────────────────────────────────────── */
 function loadRuns(){$('logView').hidden=true;$('runsBox').hidden=false;refreshRuns().then(renderRuns)}
