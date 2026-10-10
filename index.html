@@ -49,7 +49,7 @@ header h1 small{display:block;font:400 11px/1.3 var(--f-body);letter-spacing:.02
 #status span{font-size:12.5px;color:var(--muted)}
 @keyframes pulse{50%{opacity:.35}} @media (prefers-reduced-motion:reduce){#status.run .dot{animation:none}}
 main{flex:1;overflow-y:auto;padding:14px 16px 18px;-webkit-overflow-scrolling:touch}
-nav{display:grid;grid-template-columns:repeat(5,1fr);background:var(--nav);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav{display:grid;grid-template-columns:repeat(6,1fr);background:var(--nav);padding-bottom:env(safe-area-inset-bottom,0px)}
 nav button{background:none;border:0;color:var(--nav-ink);padding:9px 2px 8px;font-size:11.5px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
 nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 nav button[aria-selected="true"]{color:#fff;box-shadow:inset 0 3px 0 var(--accent)}
@@ -72,6 +72,7 @@ h2{font:600 17px/1.2 var(--f-head);letter-spacing:.05em;text-transform:uppercase
 .btn.sm{display:inline-block;width:auto;padding:8px 12px;font-size:13px;border-radius:8px}
 .btn.danger{background:var(--bad);color:#fff}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+textarea{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);font:14px var(--f-mono,monospace);min-height:130px;resize:vertical}
 input[type=text],input[type=password],input[type=search],select{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);font-size:16px}
 label.f{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow-y:auto;margin-top:8px}
@@ -136,6 +137,27 @@ a{color:var(--run)}
       <p class="hint" style="font-size:12.5px;color:var(--muted)">Запускается полный расчёт с фильтром, готовые файлы поставщика появятся во вкладке «Файлы».</p>
     </section>
 
+    <!-- ЗАМЕНЫ -->
+    <section class="tab" id="tab-rep" hidden>
+      <h2>Замены Plan-Fact</h2>
+      <div class="card">
+        <label class="f" for="repTxt">Таблица замен (дата · было → стало · аналог)</label>
+        <textarea id="repTxt" placeholder="10.10  RBS1269+RBU1232 → RBB1093&#10;12.10  RAS2381 → RAN2435  RAN2432" spellcheck="false" autocapitalize="characters" autocorrect="off"></textarea>
+        <div id="repParsed" class="hint" style="font-size:12.5px;color:var(--muted);margin-top:6px">Вставьте текст — замены распознаются автоматически.</div>
+      </div>
+      <div class="card">
+        <label class="f" for="repSrc">Исходный Plan-Fact</label>
+        <select id="repSrc"><option value="">самый новый plan_fact_all_*</option></select>
+        <div class="row" style="display:block"><div class="l"><b>Поставщики для пересчёта графиков</b></div><div class="chips" id="repSup"><button type="button" class="chip" data-s="Lear" aria-pressed="true">Lear</button><button type="button" class="chip" data-s="Fuyao" aria-pressed="true">Fuyao</button></div></div>
+        <div class="row"><div class="l"><b>Неделя графиков</b></div><div class="seg" id="segWeek3"><button type="button" data-v="current" aria-pressed="true">текущая</button><button type="button" data-v="next" aria-pressed="false">новая</button></div></div>
+        <label class="f" for="repFz">Freeze (до этой даты поставки не пересчитываются)</label>
+        <input type="text" id="repFz" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <button class="btn" id="runRep" type="button">▶ Замены + пересчёт графиков</button>
+      <div class="grid2" style="margin-top:8px"><button class="btn sec" id="runRepOnly" type="button">Только замены</button><button class="btn sec" id="runRecalc" type="button">Только пересчёт</button></div>
+      <p class="hint" style="font-size:12.5px;color:var(--muted)">Таблица уходит в репозиторий, расчёт идёт в облаке. Новый Plan-Fact и графики появятся во вкладке «Файлы» (папки Plan-Fact и Графики_поставщиков). Исходный Plan-Fact не меняется.</p>
+    </section>
+
     <!-- ФАЙЛЫ -->
     <section class="tab" id="tab-files" hidden>
       <h2>Готовые файлы</h2>
@@ -174,6 +196,7 @@ a{color:var(--run)}
   <nav role="tablist" aria-label="Разделы">
     <button role="tab" data-tab="calc" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>Расчёт</button>
     <button role="tab" data-tab="supp" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10"/></svg>Поставщик</button>
+    <button role="tab" data-tab="rep" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>Замены</button>
     <button role="tab" data-tab="files" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v4h4"/></svg>Файлы</button>
     <button role="tab" data-tab="data" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Данные</button>
     <button role="tab" data-tab="log" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg>Журнал</button>
@@ -224,10 +247,10 @@ function needCfg(){if(!S.repo||!S.token){openSettings();toast('Введите р
 
 /* ── Вкладки ──────────────────────────────────────────────── */
 function showTab(n){
-  ['calc','supp','files','data','log'].forEach(function(t){$('tab-'+t).hidden=t!==n});
+  ['calc','supp','rep','files','data','log'].forEach(function(t){$('tab-'+t).hidden=t!==n});
   document.querySelectorAll('nav button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.tab===n)});
   ls('mrp_tab',n);$('main').scrollTop=0;
-  if(S.token){if(n==='files')loadFiles();if(n==='data')loadData();if(n==='log')loadRuns()}
+  if(S.token){if(n==='rep')loadRepSrc();if(n==='files')loadFiles();if(n==='data')loadData();if(n==='log')loadRuns()}
 }
 document.querySelectorAll('nav button').forEach(function(b){b.addEventListener('click',function(){showTab(b.dataset.tab)})});
 function seg(id,cb){var el=$(id);el.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;el.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b)});cb(b.dataset.v)})}
@@ -394,6 +417,55 @@ function upOne(f,box){
     });
   }).then(function(){bar.style.width='100%';sp.textContent=fmtSize(f.size)+' · загружен ✓'}).catch(function(e){sp.textContent='Ошибка: '+e.message;sp.style.color='var(--bad)'});
 }
+
+
+/* ── Замены Plan-Fact → графики (Задача 34) ───────────────── */
+function parseRep(t){
+  var idg=/R[A-Z]{2}\d{3,4}(?:\s*\+\s*R[A-Z]{2}\d{3,4})*/g,out=[];
+  String(t).replace(/\r/g,'').split('\n').forEach(function(l){
+    l=l.trim().toUpperCase();var m=l.match(/\b(\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\b/),g=l.match(idg);
+    if(!m||!g||g.length<2)return;
+    out.push({d:m[1],was:g[0].replace(/\s+/g,''),now:g[1].replace(/\s+/g,''),an:g[2]?g[2].replace(/\s+/g,''):''});
+  });
+  return out;
+}
+function repCsv(a){return a.map(function(o){return [o.d,o.was,o.now,o.an].filter(function(x,i){return i<3||x}).join(';')}).join('\n')+'\n'}
+function showRep(){
+  var a=parseRep($('repTxt').value),b=$('repParsed');
+  b.innerHTML=a.length?('Распознано замен: <b>'+a.length+'</b><br>'+a.map(function(o){return esc(o.d+': '+o.was+' → '+o.now+(o.an?' (аналог '+o.an+')':''))}).join('<br>')):'Вставьте текст — замены распознаются автоматически.';
+  ls('mrp_repTxt',$('repTxt').value);
+}
+$('repTxt').addEventListener('input',showRep);
+function mskDate(add){var d=new Date(Date.now()+3*3600000+add*86400000);return d.toISOString().slice(0,10)}
+function defFreeze(){var s=[];document.querySelectorAll('#repSup .chip[aria-pressed="true"]').forEach(function(b){s.push(b.dataset.s+'='+mskDate(b.dataset.s==='Fuyao'?1:0))});return s.join(';')}
+document.querySelectorAll('#repSup .chip').forEach(function(b){b.addEventListener('click',function(){b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')!=='true');$('repFz').value=defFreeze()})});
+S.week3='current';seg('segWeek3',function(v){S.week3=v});
+function loadRepSrc(){
+  if(needCfg())return;
+  gh('/contents/'+enc('Входные данные')+'?ref='+REF).then(function(a){
+    var names=(a||[]).filter(function(x){return x.type==='file'&&/^plan_fact_all_.*\.xlsx$/i.test(x.name)}).map(function(x){return x.name}).sort().reverse();
+    var sel=$('repSrc'),cur=sel.value;sel.innerHTML='<option value="">самый новый plan_fact_all_*</option>'+names.map(function(n){return '<option>'+esc(n)+'</option>'}).join('');sel.value=cur;
+  }).catch(function(){});
+}
+function runRep(kind){
+  if(needCfg())return;
+  var sup=[];document.querySelectorAll('#repSup .chip[aria-pressed="true"]').forEach(function(b){sup.push(b.dataset.s)});
+  var a=parseRep($('repTxt').value);
+  if(kind!=='recalc'&&!a.length){toast('Не распознано ни одной замены');return}
+  if(kind!=='replace'&&!sup.length){toast('Выберите поставщика');return}
+  if(S.activeRun){toast('Сейчас уже идёт прогон. Дождитесь окончания или отмените его.',4500);return}
+  var go=function(){dispatch({action:kind==='all'?'replace_recalc':kind,supplier:sup.join(','),graphs_week:S.week3,pf_src:$('repSrc').value,freeze:kind==='replace'?'':$('repFz').value.trim()},
+    kind==='recalc'?'пересчёт графиков':(kind==='replace'?'замены Plan-Fact':'замены + пересчёт'))};
+  if(kind==='recalc')return go();
+  var csv=repCsv(a),body={message:'ops: таблица замен',content:btoa(unescape(encodeURIComponent('\ufeff'+csv))),branch:INBOX_BRANCH};
+  ensureBranch().then(function(){return gh('/contents/ops/replace_table.csv?ref='+INBOX_BRANCH).catch(function(){return null})}).then(function(ex){
+    if(ex&&ex.sha)body.sha=ex.sha;return gh('/contents/ops/replace_table.csv',{method:'PUT',body:body})
+  }).then(go).catch(function(e){toast('Таблица не загружена: '+e.message,6000)});
+}
+$('runRep').addEventListener('click',function(){runRep('all')});
+$('runRepOnly').addEventListener('click',function(){runRep('replace')});
+$('runRecalc').addEventListener('click',function(){runRep('recalc')});
+$('repFz').value=defFreeze();$('repTxt').value=ls('mrp_repTxt')||'';showRep();
 
 /* ── Журнал ───────────────────────────────────────────────── */
 function loadRuns(){$('logView').hidden=true;$('runsBox').hidden=false;refreshRuns().then(renderRuns)}
