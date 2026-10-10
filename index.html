@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MRP">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1f2a37">
+<title>MRP Пульт</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Oswald:wght@500;600&display=swap">
+<style>
+/* Раскладка: шапка со статусом последнего прогона, контент по вкладкам, нижняя панель вкладок (как пульт диспетчера). */
+:root{
+  --bg:#eef0f2; --panel:#ffffff; --ink:#18212b; --muted:#5d6b79; --line:#d7dce1;
+  --accent:#e8590c; --accent-ink:#ffffff; --nav:#1f2a37; --nav-ink:#cfd6de;
+  --ok:#1f8a4c; --warn:#b7791f; --bad:#c92a2a; --run:#1c6ed5; --chip:#e4e8ec;
+  --f-head:'Oswald','Arial Narrow',sans-serif; --f-body:'IBM Plex Sans',-apple-system,'Segoe UI',sans-serif; --f-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12181f; --panel:#1b242d; --ink:#e7ecf1; --muted:#93a1af; --line:#2c3844;
+  --accent:#ff7a2f; --accent-ink:#1a0e05; --nav:#0c1116; --nav-ink:#93a1af;
+  --ok:#4cc380; --warn:#e0a63a; --bad:#ff7b7b; --run:#6aa8ff; --chip:#26323d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12181f; --panel:#1b242d; --ink:#e7ecf1; --muted:#93a1af; --line:#2c3844;
+  --accent:#ff7a2f; --accent-ink:#1a0e05; --nav:#0c1116; --nav-ink:#93a1af;
+  --ok:#4cc380; --warn:#e0a63a; --bad:#ff7b7b; --run:#6aa8ff; --chip:#26323d; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:flex;flex-direction:column;height:100%;max-width:640px;margin:0 auto}
+header{padding:12px 16px;background:var(--nav);color:#fff;display:flex;gap:12px;align-items:center;justify-content:space-between}
+header h1{font:600 20px/1 var(--f-head);letter-spacing:.06em;text-transform:uppercase;margin:0}
+header h1 small{display:block;font:400 11px/1.3 var(--f-body);letter-spacing:.02em;text-transform:none;color:var(--nav-ink);margin-top:3px}
+.iconbtn{background:transparent;border:1px solid #ffffff33;color:#fff;border-radius:8px;padding:7px 10px;font-size:13px}
+#status{margin:0;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;gap:10px;align-items:center;min-height:52px}
+#status .dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none}
+#status.run .dot{background:var(--run);animation:pulse 1.2s infinite}
+#status.ok .dot{background:var(--ok)} #status.bad .dot{background:var(--bad)}
+#status .txt{flex:1;min-width:0}
+#status b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#status span{font-size:12.5px;color:var(--muted)}
+@keyframes pulse{50%{opacity:.35}} @media (prefers-reduced-motion:reduce){#status.run .dot{animation:none}}
+main{flex:1;overflow-y:auto;padding:14px 16px 18px;-webkit-overflow-scrolling:touch}
+nav{display:grid;grid-template-columns:repeat(5,1fr);background:var(--nav);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{background:none;border:0;color:var(--nav-ink);padding:9px 2px 8px;font-size:11.5px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+nav button[aria-selected="true"]{color:#fff;box-shadow:inset 0 3px 0 var(--accent)}
+.tab[hidden]{display:none}
+h2{font:600 17px/1.2 var(--f-head);letter-spacing:.05em;text-transform:uppercase;margin:0 0 10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card p.hint{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);min-width:0}
+.row:first-child{border-top:0}
+.row .l{min-width:0;flex:1} .row .l b{display:block;font-weight:500;overflow-wrap:anywhere} .row .l span{font-size:12.5px;color:var(--muted)}
+.switch{appearance:none;-webkit-appearance:none;width:48px;height:28px;border-radius:14px;background:var(--chip);position:relative;border:1px solid var(--line);flex:none;transition:background .15s}
+.switch::after{content:"";position:absolute;left:2px;top:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;transition:left .15s}
+.switch:checked{background:var(--accent);border-color:var(--accent)} .switch:checked::after{left:22px}
+.seg{display:grid;grid-auto-flow:column;gap:0;background:var(--chip);border-radius:9px;padding:3px}
+.seg button{border:0;background:none;padding:7px 10px;border-radius:7px;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);font-weight:600;box-shadow:0 1px 2px #0003}
+.btn{display:block;width:100%;border:0;border-radius:11px;padding:14px;font:600 16px var(--f-body);background:var(--accent);color:var(--accent-ink)}
+.btn:active{filter:brightness(.92)} .btn[disabled]{opacity:.5}
+.btn.sec{background:var(--chip);color:var(--ink);font-weight:500;font-size:14px;padding:12px 8px}
+.btn.sm{display:inline-block;width:auto;padding:8px 12px;font-size:13px;border-radius:8px}
+.btn.danger{background:var(--bad);color:#fff}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+input[type=text],input[type=password],input[type=search],select{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);font-size:16px}
+label.f{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow-y:auto;margin-top:8px}
+.chip{border:1px solid var(--line);background:var(--chip);border-radius:16px;padding:6px 11px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.badge{font:500 11px var(--f-mono);padding:2px 7px;border-radius:5px;background:var(--chip);color:var(--muted);white-space:nowrap}
+.badge.ok{color:var(--ok)} .badge.bad{color:var(--bad)} .badge.run{color:var(--run)}
+pre.log{font:12px/1.5 var(--f-mono);background:#0c1116;color:#d6dde4;border-radius:10px;padding:12px;max-height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:8px 0 0}
+pre.log .e{color:#ff8a8a} pre.log .w{color:#f0c36a}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:20px;text-align:center;color:var(--muted)}
+.bar{height:6px;background:var(--chip);border-radius:3px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;width:0;background:var(--accent)}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:12px 14px;border-radius:10px;font-size:14px;z-index:9;max-width:608px;margin:0 auto}
+.sheet{position:fixed;inset:0;background:#000a;z-index:8;display:flex;align-items:flex-end;justify-content:center}
+.sheet .in{background:var(--panel);width:100%;max-width:640px;border-radius:16px 16px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px));max-height:92%;overflow:auto}
+.empty{color:var(--muted);text-align:center;padding:18px 8px}
+a{color:var(--run)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>MRP Пульт<small id="repoLabel">не настроено</small></h1>
+    <button class="iconbtn" id="btnSettings" type="button">Настройки</button>
+  </header>
+  <p id="status" aria-live="polite"><i class="dot"></i><span class="txt"><b>Нет данных</b><span>Введите токен в настройках</span></span><button class="btn sec sm" id="btnCancel" type="button" hidden>Отменить</button></p>
+
+  <main id="main">
+    <!-- РАСЧЁТ -->
+    <section class="tab" id="tab-calc">
+      <h2>Расчёт MRP</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Выгрузить месячные заказы</b><span>Папка «Monthly orders»</span></div><input class="switch" type="checkbox" id="optOrders"></div>
+        <div class="row"><div class="l"><b>Выгрузить графики поставок</b><span>Папка «Графики_поставщиков»</span></div><input class="switch" type="checkbox" id="optGraphs"></div>
+        <div class="row"><div class="l"><b>Неделя для графиков</b></div><div class="seg" id="segWeek"><button type="button" data-v="next" aria-pressed="true">следующая</button><button type="button" data-v="current" aria-pressed="false">текущая</button></div></div>
+        <div class="row"><div class="l"><b>Стоп при ошибках структуры</b><span>Иначе замечания только в логе</span></div><input class="switch" type="checkbox" id="optStrict"></div>
+        <div class="row" style="display:block"><div class="l"><b>Поставщики для выгрузки</b><span id="suppHint">Все поставщики</span></div>
+          <div class="chips" id="suppChips"></div></div>
+      </div>
+      <button class="btn" id="runFull" type="button">▶ Запустить расчёт</button>
+      <p class="card hint" style="margin-top:12px;font-size:12.5px;color:var(--muted)">Расчёт идёт в облаке GitHub и занимает несколько минут. Телефон можно заблокировать: статус обновится, когда вернётесь.</p>
+      <h2 style="margin-top:18px">Другие операции</h2>
+      <div class="grid2">
+        <button class="btn sec" data-act="switch" type="button">Только переключения</button>
+        <button class="btn sec" data-act="paint_stats" type="button">Статистика цветов</button>
+        <button class="btn sec" data-act="check_inputs" type="button">Проверить входные</button>
+        <button class="btn sec" data-act="config_diff" type="button">Справочники</button>
+        <button class="btn sec" data-act="selfcheck" type="button">Комплектность</button>
+      </div>
+    </section>
+
+    <!-- ПОСТАВЩИК -->
+    <section class="tab" id="tab-supp" hidden>
+      <h2>Выгрузка по поставщику</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Что выгрузить</b></div><div class="seg" id="segKind"><button type="button" data-v="orders" aria-pressed="true">Заказы</button><button type="button" data-v="graphs" aria-pressed="false">Графики</button></div></div>
+        <div class="row" id="rowWeek2"><div class="l"><b>Неделя</b></div><div class="seg" id="segWeek2"><button type="button" data-v="next" aria-pressed="true">следующая</button><button type="button" data-v="current" aria-pressed="false">текущая</button></div></div>
+        <label class="f" for="suppSearch">Поставщик</label>
+        <input type="search" id="suppSearch" placeholder="Поиск…" autocomplete="off">
+        <div class="chips" id="suppPick"></div>
+      </div>
+      <button class="btn" id="runSupp" type="button" disabled>📦 Сгенерировать</button>
+      <p class="hint" style="font-size:12.5px;color:var(--muted)">Запускается полный расчёт с фильтром, готовые файлы поставщика появятся во вкладке «Файлы».</p>
+    </section>
+
+    <!-- ФАЙЛЫ -->
+    <section class="tab" id="tab-files" hidden>
+      <h2>Готовые файлы</h2>
+      <div class="grid2" style="margin-bottom:12px"><button class="btn sec" id="reloadFiles" type="button">Обновить список</button><button class="btn sec" id="filesInfo" type="button" disabled>—</button></div>
+      <div id="filesBox"><div class="empty">Загрузка…</div></div>
+    </section>
+
+    <!-- ДАННЫЕ -->
+    <section class="tab" id="tab-data" hidden>
+      <h2>Входные данные</h2>
+      <div class="card">
+        <div class="drop"><b>Загрузить файлы с телефона</b><br><span style="font-size:13px">Plan-Fact, остатки, BOM и другие xlsx из «Файлов» или iCloud</span><br><br>
+          <input type="file" id="fileIn" multiple accept=".xlsx,.xls,.xlsm,.csv,.json,.txt,.XLSX">
+        </div>
+        <div id="upList"></div>
+        <p class="hint">Загруженный файл кладётся поверх одноимённого файла из «Входные данные» и действует на каждый следующий расчёт, пока вы его не удалите.</p>
+      </div>
+      <h2 style="margin-top:16px">Загружено с телефона</h2>
+      <div class="card" id="inboxBox"><div class="empty">Загрузка…</div></div>
+      <h2 style="margin-top:16px">Уже в репозитории</h2>
+      <div class="card"><input type="search" id="repoSearch" placeholder="Поиск по имени…"><div id="repoFiles" style="margin-top:6px"></div></div>
+    </section>
+
+    <!-- ЖУРНАЛ -->
+    <section class="tab" id="tab-log" hidden>
+      <h2>Журнал прогонов</h2>
+      <div id="runsBox"><div class="empty">Загрузка…</div></div>
+      <div id="logView" hidden>
+        <div class="grid2" style="margin:8px 0"><button class="btn sec" id="logBack" type="button">← К списку</button><button class="btn sec" id="logFilter" type="button" aria-pressed="false">Только ошибки</button></div>
+        <b id="logTitle"></b>
+        <pre class="log" id="logPre"></pre>
+      </div>
+    </section>
+  </main>
+
+  <nav role="tablist" aria-label="Разделы">
+    <button role="tab" data-tab="calc" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>Расчёт</button>
+    <button role="tab" data-tab="supp" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10"/></svg>Поставщик</button>
+    <button role="tab" data-tab="files" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v4h4"/></svg>Файлы</button>
+    <button role="tab" data-tab="data" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Данные</button>
+    <button role="tab" data-tab="log" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg>Журнал</button>
+  </nav>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="in">
+    <h2>Настройки</h2>
+    <label class="f" for="setRepo">Репозиторий (владелец/имя)</label>
+    <input type="text" id="setRepo" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="slavakam-source/MRP">
+    <label class="f" for="setToken">Токен GitHub (fine-grained)</label>
+    <input type="password" id="setToken" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="github_pat_…">
+    <p class="hint" style="font-size:12.5px;color:var(--muted)">Права токена только для этого репозитория: Actions — Read and write, Contents — Read and write. Токен хранится в памяти браузера этого телефона и уходит только на api.github.com.</p>
+    <div class="grid2" style="margin-top:12px"><button class="btn" id="saveSet" type="button">Сохранить</button><button class="btn sec" id="clearSet" type="button">Выйти</button></div>
+    <button class="btn sec" id="closeSet" type="button" style="margin-top:8px">Закрыть</button>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+'use strict';
+var WF='mrp.yml', REF='main', INBOX_BRANCH='inputs', RES_BRANCH='results';
+var S={repo:'',token:'',week:'next',kind:'orders',week2:'next',supp:'',picked:{},suppliers:[],runs:[],activeRun:null,pollT:null,inbox:[],logFilter:false,curLog:''};
+var $=function(i){return document.getElementById(i)};
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){return null}}
+function toast(t,ms){var e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){e.hidden=true},ms||3500)}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function enc(p){return p.split('/').map(encodeURIComponent).join('/')}
+function fmtSize(n){if(n>1048576)return (n/1048576).toFixed(1)+' МБ';if(n>1024)return Math.round(n/1024)+' КБ';return n+' Б'}
+function fmtTime(s){if(!s)return '';var d=new Date(s);return d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+function ago(s){var m=Math.round((Date.now()-new Date(s))/60000);if(m<1)return 'только что';if(m<60)return m+' мин назад';var h=Math.round(m/60);if(h<48)return h+' ч назад';return Math.round(h/24)+' дн назад'}
+
+/* ── GitHub API ───────────────────────────────────────────── */
+function gh(path,opt){
+  opt=opt||{};
+  var h={'Accept':opt.raw?'application/vnd.github.raw+json':'application/vnd.github+json','Authorization':'Bearer '+S.token,'X-GitHub-Api-Version':'2022-11-28'};
+  if(opt.body)h['Content-Type']='application/json';
+  return fetch('https://api.github.com/repos/'+S.repo+path,{method:opt.method||'GET',headers:h,body:opt.body?JSON.stringify(opt.body):undefined,cache:'no-store'}).then(function(r){
+    if(opt.res)return r;
+    if(r.status===204)return null;
+    if(!r.ok){return r.text().then(function(t){var m=t;try{m=JSON.parse(t).message}catch(e){}var er=new Error(m||('HTTP '+r.status));er.status=r.status;throw er})}
+    return opt.raw&&opt.text?r.text():(opt.raw&&opt.blob?r.blob():r.json());
+  });
+}
+function needCfg(){if(!S.repo||!S.token){openSettings();toast('Введите репозиторий и токен');return true}return false}
+
+/* ── Вкладки ──────────────────────────────────────────────── */
+function showTab(n){
+  ['calc','supp','files','data','log'].forEach(function(t){$('tab-'+t).hidden=t!==n});
+  document.querySelectorAll('nav button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.tab===n)});
+  ls('mrp_tab',n);$('main').scrollTop=0;
+  if(S.token){if(n==='files')loadFiles();if(n==='data')loadData();if(n==='log')loadRuns()}
+}
+document.querySelectorAll('nav button').forEach(function(b){b.addEventListener('click',function(){showTab(b.dataset.tab)})});
+function seg(id,cb){var el=$(id);el.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;el.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b)});cb(b.dataset.v)})}
+seg('segWeek',function(v){S.week=v;ls('mrp_week',v)});
+seg('segWeek2',function(v){S.week2=v});
+seg('segKind',function(v){S.kind=v;$('rowWeek2').style.display=v==='graphs'?'':'none'});
+$('rowWeek2').style.display='none';
+
+/* ── Настройки ────────────────────────────────────────────── */
+function openSettings(){$('setRepo').value=S.repo||'slavakam-source/MRP';$('setToken').value=S.token||'';$('sheet').hidden=false}
+$('btnSettings').addEventListener('click',openSettings);
+$('closeSet').addEventListener('click',function(){$('sheet').hidden=true});
+$('saveSet').addEventListener('click',function(){
+  var r=$('setRepo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,''),t=$('setToken').value.trim();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(r)||!t){toast('Проверьте репозиторий и токен');return}
+  S.repo=r;S.token=t;ls('mrp_repo',r);ls('mrp_token',t);$('sheet').hidden=true;init(true);
+});
+$('clearSet').addEventListener('click',function(){ls('mrp_token',null);S.token='';stopPoll();$('sheet').hidden=true;renderStatus(null);$('repoLabel').textContent='не настроено'});
+
+/* ── Статус последнего прогона ────────────────────────────── */
+var STAT={queued:'В очереди',in_progress:'Идёт расчёт',waiting:'Ожидание',requested:'В очереди',pending:'В очереди'};
+function runClass(r){if(!r)return '';if(r.status!=='completed')return 'run';return r.conclusion==='success'?'ok':'bad'}
+function runLabel(r){if(r.status!=='completed')return STAT[r.status]||r.status;return {success:'Готово',failure:'Ошибка',cancelled:'Отменён',timed_out:'Время вышло'}[r.conclusion]||r.conclusion}
+function renderStatus(r){
+  var el=$('status');el.className=runClass(r);
+  var t=el.querySelector('.txt');
+  if(!r){t.innerHTML='<b>Нет данных</b><span>'+(S.token?'Прогонов ещё не было':'Введите токен в настройках')+'</span>';$('btnCancel').hidden=true;return}
+  t.innerHTML='<b>'+esc(r.display_title||('Прогон #'+r.run_number))+'</b><span>'+esc(runLabel(r))+' · '+esc(r.status==='completed'?ago(r.updated_at):('с '+fmtTime(r.run_started_at||r.created_at)))+'</span>';
+  $('btnCancel').hidden=r.status==='completed';
+}
+function stopPoll(){clearInterval(S.pollT);S.pollT=null}
+function startPoll(){if(S.pollT)return;S.pollT=setInterval(refreshRuns,8000)}
+function refreshRuns(){
+  if(!S.token)return Promise.resolve();
+  return gh('/actions/workflows/'+WF+'/runs?per_page=15').then(function(d){
+    S.runs=d.workflow_runs||[];var r=S.runs[0]||null;var was=S.activeRun;
+    S.activeRun=r&&r.status!=='completed'?r.id:null;renderStatus(r);
+    if(S.activeRun)startPoll();else{stopPoll();if(was&&r&&r.id===was){toast(runLabel(r)+': '+(r.display_title||''),5000);if(!$('tab-files').hidden)loadFiles()}}
+    if(!$('tab-log').hidden&&$('logView').hidden)renderRuns();
+  }).catch(function(e){
+    var t=$('status').querySelector('.txt');
+    if(e.status===404&&/Not Found/i.test(e.message)){t.innerHTML='<b>Workflow не найден</b><span>Добавьте .github/workflows/mrp.yml в ветку main</span>'}
+    else if(e.status===401||e.status===403){t.innerHTML='<b>Нет доступа</b><span>'+esc(e.message)+'</span>'}
+    else t.innerHTML='<b>Нет связи с GitHub</b><span>'+esc(e.message)+'</span>';
+  });
+}
+$('btnCancel').addEventListener('click',function(){
+  if(!S.activeRun)return;gh('/actions/runs/'+S.activeRun+'/cancel',{method:'POST'}).then(function(){toast('Отмена отправлена');setTimeout(refreshRuns,1500)}).catch(function(e){toast(e.message)});
+});
+
+/* ── Запуск ───────────────────────────────────────────────── */
+function dispatch(inputs,label){
+  if(needCfg())return;
+  if(S.activeRun){toast('Сейчас уже идёт прогон. Дождитесь окончания или отмените его.',4500);return}
+  var bodyInputs={};Object.keys(inputs).forEach(function(k){bodyInputs[k]=String(inputs[k])});
+  gh('/actions/workflows/'+WF+'/dispatches',{method:'POST',body:{ref:REF,inputs:bodyInputs}}).then(function(){
+    toast('Запущено: '+label);setTimeout(refreshRuns,2500);setTimeout(refreshRuns,6000);
+  }).catch(function(e){
+    toast(e.status===404?'Не найден workflow mrp.yml в ветке main':'Не запущено: '+e.message,6000);
+  });
+}
+$('runFull').addEventListener('click',function(){
+  var sel=Object.keys(S.picked).filter(function(k){return S.picked[k]});
+  dispatch({action:'full',export_orders:$('optOrders').checked,export_graphs:$('optGraphs').checked,graphs_week:S.week,strict:$('optStrict').checked,supplier:sel.join(',')},'расчёт MRP');
+});
+document.querySelectorAll('[data-act]').forEach(function(b){b.addEventListener('click',function(){dispatch({action:b.dataset.act},b.textContent.trim())})});
+['optOrders','optGraphs','optStrict'].forEach(function(id){var e=$(id);e.checked=ls('mrp_'+id)==='1';e.addEventListener('change',function(){ls('mrp_'+id,e.checked?'1':'0')})});
+$('runSupp').addEventListener('click',function(){
+  if(!S.supp)return;
+  dispatch({action:'supplier',supplier:S.supp,supplier_kind:S.kind,graphs_week:S.week2},(S.kind==='orders'?'заказы':'графики')+' · '+S.supp);
+});
+
+/* ── Поставщики ───────────────────────────────────────────── */
+function loadSuppliers(){
+  return gh('/contents/supplier_registry.json?ref='+REF,{raw:true,text:true}).then(function(t){
+    var d=JSON.parse(t);S.suppliers=Object.keys(d).sort();ls('mrp_suppliers',JSON.stringify(S.suppliers));renderSuppliers()
+  }).catch(function(){try{S.suppliers=JSON.parse(ls('mrp_suppliers')||'[]')}catch(e){S.suppliers=[]}renderSuppliers()});
+}
+function renderSuppliers(){
+  var box=$('suppChips');box.innerHTML='';
+  S.suppliers.forEach(function(n){var b=document.createElement('button');b.type='button';b.className='chip';b.textContent=n;b.setAttribute('aria-pressed',!!S.picked[n]);
+    b.addEventListener('click',function(){S.picked[n]=!S.picked[n];b.setAttribute('aria-pressed',S.picked[n]);var c=Object.keys(S.picked).filter(function(k){return S.picked[k]}).length;$('suppHint').textContent=c?('Выбрано: '+c+' (выгрузка только по ним)'):'Все поставщики'});box.appendChild(b)});
+  renderPick();
+}
+function renderPick(){
+  var q=$('suppSearch').value.trim().toLowerCase(),box=$('suppPick');box.innerHTML='';
+  S.suppliers.filter(function(n){return !q||n.toLowerCase().indexOf(q)>=0}).forEach(function(n){var b=document.createElement('button');b.type='button';b.className='chip';b.textContent=n;b.setAttribute('aria-pressed',S.supp===n);
+    b.addEventListener('click',function(){S.supp=n;$('runSupp').disabled=false;$('runSupp').textContent='📦 Сгенерировать: '+n;renderPick()});box.appendChild(b)});
+}
+$('suppSearch').addEventListener('input',renderPick);
+
+/* ── Файлы (результаты) ───────────────────────────────────── */
+function download(path,name){
+  toast('Скачиваю '+name+'…',20000);
+  gh('/contents/'+enc(path)+'?ref='+RES_BRANCH,{raw:true,blob:true}).then(function(blob){
+    var f=new File([blob],name,{type:blob.type||'application/octet-stream'});
+    var done=function(){$('toast').hidden=true};
+    if(navigator.canShare&&navigator.canShare({files:[f]})){return navigator.share({files:[f],title:name}).then(done).catch(function(e){if(e&&e.name==='AbortError')return done();saveBlob(blob,name);done()})}
+    saveBlob(blob,name);done();
+  }).catch(function(e){toast('Не скачано: '+e.message,6000)});
+}
+function saveBlob(blob,name){var u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove()},4000)}
+function loadFiles(){
+  if(needCfg())return;
+  gh('/contents/meta.json?ref='+RES_BRANCH,{raw:true,text:true}).then(function(t){
+    var m=JSON.parse(t);$('filesInfo').textContent=(m.rc===0?'ОК · ':'Ошибка · ')+ago(m.finished);
+    var groups={};(m.files||[]).forEach(function(f){var p=f.path.replace(/^files\//,'');var parts=p.split('/');var g=parts.length>1?parts[0]:'Основные результаты';(groups[g]=groups[g]||[]).push({path:f.path,name:parts.slice(-1)[0],sub:parts.length>2?parts.slice(1,-1).join('/'):'',size:f.size,mtime:f.mtime})});
+    var html='';var keys=Object.keys(groups).sort(function(a,b){return a==='Основные результаты'?-1:b==='Основные результаты'?1:a.localeCompare(b,'ru')});
+    if(!keys.length)html='<div class="empty">Результатов пока нет. Запустите расчёт.</div>';
+    keys.forEach(function(g){html+='<div class="card"><b style="font:600 15px var(--f-head);letter-spacing:.05em;text-transform:uppercase">'+esc(g)+'</b>';
+      groups[g].sort(function(a,b){return a.path.localeCompare(b.path,'ru')}).forEach(function(f){html+='<div class="row"><div class="l"><b>'+esc(f.name)+'</b><span>'+(f.sub?esc(f.sub)+' · ':'')+fmtSize(f.size)+' · '+esc(fmtTime(f.mtime))+'</span></div><button class="btn sm sec" data-dl="'+esc(f.path)+'" data-n="'+esc(f.name)+'" type="button">Скачать</button></div>'});html+='</div>'});
+    $('filesBox').innerHTML=html;
+    $('filesBox').querySelectorAll('[data-dl]').forEach(function(b){b.addEventListener('click',function(){download(b.dataset.dl,b.dataset.n)})});
+  }).catch(function(e){$('filesBox').innerHTML='<div class="empty">'+(e.status===404?'Результатов ещё нет. Запустите расчёт.':esc(e.message))+'</div>';$('filesInfo').textContent='—'});
+}
+$('reloadFiles').addEventListener('click',loadFiles);
+
+/* ── Входные данные ───────────────────────────────────────── */
+function loadData(){
+  if(needCfg())return;
+  gh('/contents/inbox?ref='+INBOX_BRANCH).then(function(a){S.inbox=Array.isArray(a)?a:[]}).catch(function(){S.inbox=[]}).then(renderInbox);
+  gh('/contents/'+enc('Входные данные')+'?ref='+REF).then(function(a){S.repoFiles=(a||[]).filter(function(x){return x.type==='file'}).map(function(x){return x.name}).sort(function(a,b){return a.localeCompare(b,'ru')});renderRepoFiles()}).catch(function(){$('repoFiles').innerHTML='<div class="empty">Не удалось прочитать список</div>'});
+}
+function renderInbox(){
+  var box=$('inboxBox');
+  if(!S.inbox.length){box.innerHTML='<div class="empty">Пока ничего не загружено</div>';return}
+  box.innerHTML='';
+  S.inbox.forEach(function(f){var d=document.createElement('div');d.className='row';d.innerHTML='<div class="l"><b>'+esc(f.name)+'</b><span>'+fmtSize(f.size)+'</span></div><button class="btn sm sec" type="button">Удалить</button>';
+    var b=d.querySelector('button'),armed=false;b.addEventListener('click',function(){
+      if(!armed){armed=true;b.textContent='Точно?';b.className='btn sm danger';setTimeout(function(){armed=false;b.textContent='Удалить';b.className='btn sm sec'},3500);return}
+      gh('/contents/inbox/'+enc(f.name),{method:'DELETE',body:{message:'inbox: удалён '+f.name,sha:f.sha,branch:INBOX_BRANCH}}).then(function(){toast('Удалено');loadData()}).catch(function(e){toast(e.message)})});
+    box.appendChild(d)});
+}
+function renderRepoFiles(){
+  var q=$('repoSearch').value.trim().toLowerCase(),over={};S.inbox.forEach(function(f){over[f.name]=1});
+  var list=(S.repoFiles||[]).filter(function(n){return !q||n.toLowerCase().indexOf(q)>=0});
+  $('repoFiles').innerHTML=list.length?list.map(function(n){return '<div class="row"><div class="l"><b style="font-weight:400;font-size:13.5px">'+esc(n)+'</b></div>'+(over[n]?'<span class="badge ok">заменён</span>':'')+'</div>'}).join(''):'<div class="empty">Ничего</div>';
+}
+$('repoSearch').addEventListener('input',renderRepoFiles);
+function ensureBranch(){
+  return gh('/git/ref/heads/'+INBOX_BRANCH).catch(function(e){
+    if(e.status!==404)throw e;
+    return gh('/git/ref/heads/'+REF).then(function(r){return gh('/git/refs',{method:'POST',body:{ref:'refs/heads/'+INBOX_BRANCH,sha:r.object.sha}})});
+  });
+}
+function readB64(file){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(',')[1]||'')};r.onerror=function(){rej(new Error('Не удалось прочитать файл'))};r.readAsDataURL(file)})}
+$('fileIn').addEventListener('change',function(){
+  if(needCfg()){this.value='';return}
+  var files=Array.prototype.slice.call(this.files);this.value='';if(!files.length)return;
+  var box=$('upList');box.innerHTML='';
+  ensureBranch().then(function(){
+    return files.reduce(function(p,f){return p.then(function(){return upOne(f,box)})},Promise.resolve());
+  }).then(function(){toast('Загрузка завершена');loadData()}).catch(function(e){toast('Ошибка: '+e.message,7000)});
+});
+function upOne(f,box){
+  var row=document.createElement('div');row.className='row';row.innerHTML='<div class="l"><b>'+esc(f.name)+'</b><span>'+fmtSize(f.size)+' · читаю…</span><div class="bar"><i></i></div></div>';box.appendChild(row);
+  var sp=row.querySelector('span'),bar=row.querySelector('i');
+  if(f.size>90*1048576){sp.textContent='Больше 90 МБ — не загружается';return Promise.resolve()}
+  return readB64(f).then(function(b64){
+    bar.style.width='35%';sp.textContent=fmtSize(f.size)+' · отправляю…';
+    return gh('/contents/inbox/'+enc(f.name)+'?ref='+INBOX_BRANCH).catch(function(){return null}).then(function(ex){
+      var body={message:'inbox: '+f.name,content:b64,branch:INBOX_BRANCH};if(ex&&ex.sha)body.sha=ex.sha;
+      return gh('/contents/inbox/'+enc(f.name),{method:'PUT',body:body});
+    });
+  }).then(function(){bar.style.width='100%';sp.textContent=fmtSize(f.size)+' · загружен ✓'}).catch(function(e){sp.textContent='Ошибка: '+e.message;sp.style.color='var(--bad)'});
+}
+
+/* ── Журнал ───────────────────────────────────────────────── */
+function loadRuns(){$('logView').hidden=true;$('runsBox').hidden=false;refreshRuns().then(renderRuns)}
+function renderRuns(){
+  var box=$('runsBox');if(!S.runs.length){box.innerHTML='<div class="empty">Прогонов ещё не было</div>';return}
+  box.innerHTML='';
+  S.runs.forEach(function(r){var d=document.createElement('button');d.type='button';d.className='card';d.style.cssText='width:100%;text-align:left;display:block;cursor:pointer';
+    d.innerHTML='<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.display_title||('#'+r.run_number))+'</b><span class="badge '+runClass(r)+'">'+esc(runLabel(r))+'</span></div><span style="font-size:12.5px;color:var(--muted)">#'+r.run_number+' · '+esc(fmtTime(r.created_at))+'</span>';
+    d.addEventListener('click',function(){openLog(r)});box.appendChild(d)});
+}
+function openLog(r){
+  $('runsBox').hidden=true;$('logView').hidden=false;$('logTitle').textContent=(r.display_title||'#'+r.run_number)+' · '+runLabel(r);
+  var pre=$('logPre');pre.textContent='Загружаю лог…';S.curLog='';
+  gh('/actions/runs/'+r.id+'/jobs').then(function(j){
+    var job=(j.jobs||[])[0];if(!job)throw new Error('нет job');
+    return gh('/actions/jobs/'+job.id+'/logs',{res:true}).then(function(resp){if(!resp.ok)throw new Error('HTTP '+resp.status);return resp.text()});
+  }).catch(function(){
+    return gh('/contents/run.log?ref='+RES_BRANCH,{raw:true,text:true}).then(function(t){return '(Лог последнего завершённого прогона)\n'+t});
+  }).then(function(t){S.curLog=t;renderLog()}).catch(function(e){pre.textContent='Лог недоступен: '+e.message});
+}
+function renderLog(){
+  var lines=S.curLog.replace(/\u001b\[[0-9;]*m/g,'').split('\n').map(function(l){return l.replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z /,'')});
+  if(S.logFilter)lines=lines.filter(function(l){return /error|ошиб|warn|предупр|traceback|\[SCHEMA\]|fail/i.test(l)});
+  var tail=lines.slice(-1500);
+  $('logPre').innerHTML=tail.length?tail.map(function(l){var c=/error|ошиб|traceback|fail/i.test(l)?'e':/warn|предупр|\[SCHEMA\]/i.test(l)?'w':'';return c?'<span class="'+c+'">'+esc(l)+'</span>':esc(l)}).join('\n'):'Нет строк';
+  var p=$('logPre');p.scrollTop=p.scrollHeight;
+}
+$('logBack').addEventListener('click',function(){$('logView').hidden=true;$('runsBox').hidden=false});
+$('logFilter').addEventListener('click',function(){S.logFilter=!S.logFilter;this.setAttribute('aria-pressed',S.logFilter);this.textContent=S.logFilter?'Весь лог':'Только ошибки';renderLog()});
+
+/* ── Старт ────────────────────────────────────────────────── */
+function init(force){
+  $('repoLabel').textContent=S.repo?S.repo:'не настроено';
+  if(!S.token||!S.repo){renderStatus(null);return}
+  refreshRuns();loadSuppliers();
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)refreshRuns()});
+}
+S.repo=ls('mrp_repo')||'slavakam-source/MRP';S.token=ls('mrp_token')||'';
+var w=ls('mrp_week');if(w==='current'){S.week='current';document.querySelectorAll('#segWeek button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v==='current')})}
+showTab(ls('mrp_tab')||'calc');init();
+if(!S.token)openSettings();
+if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(function(){})}
+})();
+</script>
+</body>
+</html>
