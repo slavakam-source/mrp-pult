@@ -113,6 +113,7 @@ a{color:var(--run)}
           <div class="chips" id="suppChips"></div></div>
       </div>
       <button class="btn" id="runFull" type="button">▶ Запустить расчёт</button>
+      <p class="hint" id="graphsInfo" style="margin-top:10px;font-size:12.5px;color:var(--muted)">Графики с шары: проверяю…</p>
       <p class="card hint" style="margin-top:12px;font-size:12.5px;color:var(--muted)">Расчёт идёт в облаке GitHub и занимает несколько минут. Телефон можно заблокировать: статус обновится, когда вернётесь.</p>
       <h2 style="margin-top:18px">Другие операции</h2>
       <div class="grid2">
@@ -546,10 +547,19 @@ $('logBack').addEventListener('click',function(){$('logView').hidden=true;$('run
 $('logFilter').addEventListener('click',function(){S.logFilter=!S.logFilter;this.setAttribute('aria-pressed',S.logFilter);this.textContent=S.logFilter?'Весь лог':'Только ошибки';renderLog()});
 
 /* ── Старт ────────────────────────────────────────────────── */
+function loadGraphsInfo(){
+  var el=$('graphsInfo');if(!el)return;
+  gh('/contents/manifest.json?ref=graphs',{raw:true,text:true}).then(function(t){
+    var m=JSON.parse(t),n=Object.keys(m.files||{}).length,u=(m.updated||'').replace('T',' ').slice(0,16);
+    var d=u?new Date(u.replace(' ','T')):null,age=d?Math.round((Date.now()-d.getTime())/3600000):null;
+    el.textContent='Графики с шары: '+n+' файл(ов), обновлены '+(u?u.slice(8,10)+'.'+u.slice(5,7)+' '+u.slice(11):'—')+
+      (age!==null&&age>6?' — давно не обновлялись, проверьте рабочий ПК':'');
+  }).catch(function(e){el.textContent=e.status===404?'Графики с шары ещё не отправлялись на GitHub — расчёт берёт графики из «Ручные графики».':'Графики с шары: не удалось проверить ('+e.message+')'});
+}
 function init(force){
   $('repoLabel').textContent=S.repo?S.repo:'не настроено';
   if(!S.token||!S.repo){renderStatus(null);return}
-  refreshRuns();loadSuppliers();
+  refreshRuns();loadSuppliers();loadGraphsInfo();
   document.addEventListener('visibilitychange',function(){if(!document.hidden)refreshRuns()});
 }
 S.repo=ls('mrp_repo')||'slavakam-source/MRP';S.token=ls('mrp_token')||'';
