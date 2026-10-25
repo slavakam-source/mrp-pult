@@ -107,6 +107,7 @@ a{color:var(--run)}
         <div class="row"><div class="l"><b>Выгрузить месячные заказы</b><span>Папка «Monthly orders»</span></div><input class="switch" type="checkbox" id="optOrders"></div>
         <div class="row"><div class="l"><b>Выгрузить графики поставок</b><span>Папка «Графики_поставщиков»</span></div><input class="switch" type="checkbox" id="optGraphs"></div>
         <div class="row"><div class="l"><b>Неделя для графиков</b></div><div class="seg" id="segWeek"><button type="button" data-v="next" aria-pressed="true">следующая</button><button type="button" data-v="current" aria-pressed="false">текущая</button></div></div>
+        <div class="row"><div class="l"><b>Риск-анализ поставок (неделя)</b><span>Даты дефицита и причины · «Риск-анализ»</span></div><input class="switch" type="checkbox" id="optRisk"></div>
         <div class="row"><div class="l"><b>Стоп при ошибках структуры</b><span>Иначе замечания только в логе</span></div><input class="switch" type="checkbox" id="optStrict"></div>
         <div class="row" style="display:block"><div class="l"><b>Поставщики для выгрузки</b><span id="suppHint">Все поставщики</span></div>
           <div class="chips" id="suppChips"></div></div>
@@ -120,6 +121,7 @@ a{color:var(--run)}
         <button class="btn sec" data-act="check_inputs" type="button">Проверить входные</button>
         <button class="btn sec" data-act="config_diff" type="button">Справочники</button>
         <button class="btn sec" data-act="selfcheck" type="button">Комплектность</button>
+        <button class="btn sec" data-act="risk" type="button">Риск-анализ (неделя)</button>
       </div>
     </section>
 
@@ -325,10 +327,11 @@ function dispatch(inputs,label){
 }
 $('runFull').addEventListener('click',function(){
   var sel=Object.keys(S.picked).filter(function(k){return S.picked[k]});
-  dispatch({action:'full',export_orders:$('optOrders').checked,export_graphs:$('optGraphs').checked,graphs_week:S.week,strict:$('optStrict').checked,supplier:sel.join(',')},'расчёт MRP');
+  dispatch({action:'full',export_orders:$('optOrders').checked,export_graphs:$('optGraphs').checked,graphs_week:S.week,strict:$('optStrict').checked,risk_analysis:$('optRisk').checked,supplier:sel.join(',')},'расчёт MRP');
 });
 document.querySelectorAll('[data-act]').forEach(function(b){b.addEventListener('click',function(){dispatch({action:b.dataset.act},b.textContent.trim())})});
 ['optOrders','optGraphs','optStrict'].forEach(function(id){var e=$(id);e.checked=ls('mrp_'+id)==='1';e.addEventListener('change',function(){ls('mrp_'+id,e.checked?'1':'0')})});
+(function(){var e=$('optRisk');e.checked=ls('mrp_optRisk')!=='0';e.addEventListener('change',function(){ls('mrp_optRisk',e.checked?'1':'0')})})();
 $('runSupp').addEventListener('click',function(){
   if(!S.supp)return;
   dispatch({action:'supplier',supplier:S.supp,supplier_kind:S.kind,graphs_week:S.week2},(S.kind==='orders'?'заказы':'графики')+' · '+S.supp);
