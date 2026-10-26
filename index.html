@@ -115,6 +115,8 @@ a{color:var(--run)}
       <button class="btn" id="runFull" type="button">▶ Запустить расчёт</button>
       <p class="hint" id="graphsInfo" style="margin-top:10px;font-size:12.5px;color:var(--muted)">Графики с шары: проверяю…</p>
       <p class="hint" id="dataInfo" style="margin-top:2px;font-size:12.5px;color:var(--muted)">Входные данные с рабочего ПК: проверяю…</p>
+      <h2 style="margin-top:18px">Риски поставок</h2>
+      <div class="card" id="riskCard"><div class="empty">Загрузка…</div></div>
       <p class="card hint" style="margin-top:12px;font-size:12.5px;color:var(--muted)">Расчёт идёт в облаке GitHub и занимает несколько минут. Телефон можно заблокировать: статус обновится, когда вернётесь.</p>
       <h2 style="margin-top:18px">Другие операции</h2>
       <div class="grid2">
@@ -359,9 +361,9 @@ function renderPick(){
 $('suppSearch').addEventListener('input',renderPick);
 
 /* ── Файлы (результаты) ───────────────────────────────────── */
-function download(path,name){
+function download(path,name,branch){
   toast('Скачиваю '+name+'…',20000);
-  gh('/contents/'+enc(path)+'?ref='+RES_BRANCH,{raw:true,blob:true}).then(function(blob){
+  gh('/contents/'+enc(path)+'?ref='+(branch||RES_BRANCH),{raw:true,blob:true}).then(function(blob){
     var f=new File([blob],name,{type:blob.type||'application/octet-stream'});
     var done=function(){$('toast').hidden=true};
     if(navigator.canShare&&navigator.canShare({files:[f]})){return navigator.share({files:[f],title:name}).then(done).catch(function(e){if(e&&e.name==='AbortError')return done();saveBlob(blob,name);done()})}
@@ -557,7 +559,28 @@ function loadBranchInfo(id,ref,title,stale,none){
       (stale&&age!==null&&age>stale?' — давно не обновлялись, проверьте рабочий ПК':'');
   }).catch(function(e){el.textContent=e.status===404?none:title+': не удалось проверить ('+e.message+')'});
 }
+function loadRisk(){
+  var box=$('riskCard');if(!box)return;
+  gh('/contents/summary.json?ref=risk',{raw:true,text:true}).then(function(t){
+    var s=JSON.parse(t),k=s.kpi||{},g=(s.generated||'').replace('T',' ');
+    var dm=function(x){return x?x.slice(8,10)+'.'+x.slice(5,7):'—'};
+    var age=g?Math.round((Date.now()-new Date(g.replace(' ','T')).getTime())/3600000):null;
+    var h='<div class="row" style="border-top:0;padding-top:0"><div class="l"><b>Обновлено '+esc(dm(g.slice(0,10))+' '+g.slice(11,16))+'</b><span>Окно '+esc(dm(s.calc))+'–'+esc(dm(s.win_end))+(s.mrp_date&&s.mrp_date!==s.calc?' · расчёт MRP от '+esc(dm(s.mrp_date)):'')+(age!==null&&age>6?' · давно не обновлялось, проверьте рабочий ПК':'')+'</span></div>'+
+      '<button class="btn sm sec" id="riskDl" type="button">Отчёт</button></div>';
+    h+='<div class="grid2" style="margin:6px 0 4px"><div><b style="font:600 26px var(--f-head);color:'+(k.deficit?'var(--bad)':'var(--ok)')+'">'+(k.deficit||0)+'</b><br><span class="hint">дефицит в окне</span></div>'+
+       '<div><b style="font:600 26px var(--f-head);color:'+(k.low?'var(--warn)':'var(--ok)')+'">'+(k.low||0)+'</b><br><span class="hint">ниже страхового · ближайший '+esc(dm(k.first_deficit))+'</span></div></div>';
+    (s.suppliers||[]).filter(function(x){return x.deficit}).slice(0,8).forEach(function(x){
+      h+='<div class="row"><div class="l"><b>'+esc(x.supplier)+' — '+x.deficit+' код(ов)</b><span>с '+esc(dm(x.first))+' · '+esc(x.cause||'')+'</span></div></div>'});
+    var top=(s.top||[]).slice(0,10);
+    if(top.length){h+='<details style="margin-top:8px"><summary style="cursor:pointer">Самые срочные коды ('+top.length+')</summary>';
+      top.forEach(function(t){h+='<div class="row"><div class="l"><b>'+esc(dm(t.date))+' · '+esc(t.code)+'</b><span>'+esc(t.supplier||'')+' · −'+(t.short||0)+' шт · '+esc((t.causes||[''])[0])+'</span></div></div>'});
+      h+='</details>'}
+    box.innerHTML=h;
+    $('riskDl').addEventListener('click',function(){download('Риск_анализ_последний.xlsx','Риск_анализ_'+(s.generated||'').slice(0,10)+'.xlsx','risk')});
+  }).catch(function(e){box.innerHTML='<div class="empty">'+(e.status===404?'Риск-анализ ещё не публиковался. Он считается на рабочем ПК каждые 3 часа (галочка «автоматически каждые 3 ч»).':'Не удалось загрузить: '+esc(e.message))+'</div>'});
+}
 function loadGraphsInfo(){
+  loadRisk();
   loadBranchInfo('graphsInfo','graphs','Графики с шары',6,'Графики с шары ещё не отправлялись на GitHub — расчёт берёт графики из «Ручные графики».');
   loadBranchInfo('dataInfo','data','Входные данные с рабочего ПК',0,'Входные данные с рабочего ПК ещё не отправлялись — расчёт берёт данные из репозитория.');
 }
