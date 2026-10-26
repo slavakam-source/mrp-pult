@@ -567,14 +567,21 @@ function loadRisk(){
     var age=g?Math.round((Date.now()-new Date(g.replace(' ','T')).getTime())/3600000):null;
     var h='<div class="row" style="border-top:0;padding-top:0"><div class="l"><b>Обновлено '+esc(dm(g.slice(0,10))+' '+g.slice(11,16))+'</b><span>Окно '+esc(dm(s.calc))+'–'+esc(dm(s.win_end))+(s.mrp_date&&s.mrp_date!==s.calc?' · расчёт MRP от '+esc(dm(s.mrp_date)):'')+(age!==null&&age>6?' · давно не обновлялось, проверьте рабочий ПК':'')+'</span></div>'+
       '<button class="btn sm sec" id="riskDl" type="button">Отчёт</button></div>';
-    h+='<div class="grid2" style="margin:6px 0 4px"><div><b style="font:600 26px var(--f-head);color:'+(k.deficit?'var(--bad)':'var(--ok)')+'">'+(k.deficit||0)+'</b><br><span class="hint">дефицит в окне</span></div>'+
-       '<div><b style="font:600 26px var(--f-head);color:'+(k.low?'var(--warn)':'var(--ok)')+'">'+(k.low||0)+'</b><br><span class="hint">ниже страхового · ближайший '+esc(dm(k.first_deficit))+'</span></div></div>';
+    (s.warnings||[]).slice(0,2).forEach(function(w){h+='<div class="hint" style="color:var(--warn);margin:4px 0">⚠ '+esc(w)+'</div>'});
+    h+='<div class="grid2" style="margin:6px 0 4px;grid-template-columns:1fr 1fr 1fr"><div><b style="font:600 26px var(--f-head);color:'+(k.deficit?'var(--bad)':'var(--ok)')+'">'+(k.deficit||0)+'</b><br><span class="hint">дефицит в окне · ближайший '+esc(dm(k.first_deficit))+'</span></div>'+
+       '<div><b style="font:600 26px var(--f-head);color:'+(k.low?'var(--warn)':'var(--ok)')+'">'+(k.low||0)+'</b><br><span class="hint">ниже страхового</span></div>'+
+       '<div><b style="font:600 26px var(--f-head);color:'+(k.over?'#4f5fd6':'var(--ok)')+'">'+(k.over||0)+'</b><br><span class="hint">сверхзапас'+(k.over?' · +'+(k.excess||0).toLocaleString('ru-RU')+' шт':'')+'</span></div></div>';
     (s.suppliers||[]).filter(function(x){return x.deficit}).slice(0,8).forEach(function(x){
       h+='<div class="row"><div class="l"><b>'+esc(x.supplier)+' — '+x.deficit+' код(ов)</b><span>с '+esc(dm(x.first))+' · '+esc(x.cause||'')+'</span></div></div>'});
     var top=(s.top||[]).slice(0,10);
     if(top.length){h+='<details style="margin-top:8px"><summary style="cursor:pointer">Самые срочные коды ('+top.length+')</summary>';
       top.forEach(function(t){h+='<div class="row"><div class="l"><b>'+esc(dm(t.date))+' · '+esc(t.code)+'</b><span>'+esc(t.supplier||'')+' · −'+(t.short||0)+' шт · '+esc((t.causes||[''])[0])+'</span></div></div>'});
       h+='</details>'}
+    var ov=(s.over_top||[]).slice(0,10);
+    if(ov.length){h+='<details style="margin-top:4px"><summary style="cursor:pointer">Сверхзапас — наибольшие превышения ('+ov.length+')</summary>';
+      ov.forEach(function(o){h+='<div class="row"><div class="l"><b>'+esc(o.code)+' · +'+(o.excess||0)+' шт</b><span>'+esc(o.supplier||'')+' · пик '+(o.peak||0)+' на '+esc(dm(o.peak_day))+' при максимуме '+(o.max||0)+' · '+esc(o.why||'')+'</span></div></div>'});
+      h+='</details>'}
+    h+='<a class="btn sm sec" style="margin-top:8px;display:inline-block;text-decoration:none" href="monitor.html" target="_blank" rel="noopener">Монитор для большого экрана</a>';
     box.innerHTML=h;
     $('riskDl').addEventListener('click',function(){download('Риск_анализ_последний.xlsx','Риск_анализ_'+(s.generated||'').slice(0,10)+'.xlsx','risk')});
   }).catch(function(e){box.innerHTML='<div class="empty">'+(e.status===404?'Риск-анализ ещё не публиковался. Он считается на рабочем ПК каждые 3 часа (галочка «автоматически каждые 3 ч»).':'Не удалось загрузить: '+esc(e.message))+'</div>'});

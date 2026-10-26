@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Риски поставок 供货风险</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!--
+  Монитор риск-анализа для большого экрана (одна страница, без прокрутки).
+  Два режима:
+   1) «Риск-анализ/Монитор.html» — mrp_risk.py вписывает данные прямо в страницу;
+      страница сама перечитывается каждые 5 минут (после авто-риск-анализа раз в 3 ч
+      покажет новые цифры). Сеть не нужна.
+   2) monitor.html на GitHub Pages (рядом с пультом) — данные берутся из ветки risk
+      (summary.json) через GitHub API с тем же репозиторием и токеном, что и в пульте;
+      обновление каждые 5 минут. ?min=2 — другой интервал, ?dark=1 — тёмная тема.
+-->
+<style>
+:root{
+  --bg:#E6E9ED; --panel:#FFFFFF; --ink:#16233B; --muted:#5E6B7D; --line:#D3D8DF;
+  --red:#C8102E; --red1:#FBE3E6; --red2:#F3A3AE; --red3:#E04A5E; --red4:#9E0B23;
+  --amber:#B57F00; --amber1:#FFF1C7; --over:#2E3FB8; --over1:#DFE3FA; --ok:#1E8C7E; --ok1:#D9F0EC;
+  --cell:#F4F6F9; --head:#16233B; --headink:#FFFFFF;
+  --f:"Golos Text","Segoe UI",Roboto,Arial,"Microsoft YaHei","PingFang SC","Noto Sans CJK SC","Noto Sans SC",sans-serif;
+}
+:root[data-theme="dark"]{
+  --bg:#0F1726; --panel:#18233A; --ink:#E8EDF5; --muted:#93A1B8; --line:#2A3853;
+  --red:#FF5A6E; --red1:#3A1E2A; --red2:#7A2636; --red3:#C2334A; --red4:#F0546A;
+  --amber:#F2C14E; --amber1:#3A3220; --over:#8E9BFF; --over1:#232C5C; --ok:#4CC6B4; --ok1:#16352F;
+  --cell:#1F2B44; --head:#26344F; --headink:#E8EDF5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f);font-variant-numeric:tabular-nums;
+  overflow:hidden;font-size:clamp(12px,0.9vw,22px)}
+.wall{height:100vh;display:grid;grid-template-rows:auto auto auto minmax(0,1fr) minmax(0,.62fr);gap:1.1vh;padding:1.6vh 1.4vw}
+header{display:flex;align-items:flex-end;gap:2vw}
+header h1{font-size:2.6em;font-weight:800;letter-spacing:-.02em;line-height:1}
+header h1 .zh{font-weight:500;color:var(--muted);margin-left:.35em;letter-spacing:0}
+.zh{font-weight:500}
+span.zh,small.zh{color:var(--muted)}
+header .win{font-size:1.25em;color:var(--muted);font-weight:500;padding-bottom:.25em}
+header .right{margin-left:auto;text-align:right;line-height:1.15}
+header .clock{font-size:2.6em;font-weight:700;letter-spacing:-.02em}
+header .upd{color:var(--muted);font-size:1em}
+header .upd.old{color:var(--amber);font-weight:700}
+.alerts{display:flex;flex-direction:column;gap:.5vh}
+.alert{background:var(--amber1);color:var(--ink);border-left:.5em solid var(--amber);padding:.5em .9em;font-size:1.02em;line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.alert.stale{border-left-color:var(--red);background:var(--red1);font-weight:600}
+.strip{display:grid;grid-template-columns:1.15fr 1.25fr 1.1fr 1.2fr .95fr .95fr;background:var(--panel);border:1px solid var(--line)}
+.k{padding:1.2vh 1.1vw;border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;min-width:0}
+.k:first-child{border-left:0}
+.k b{font-size:3.6em;font-weight:800;line-height:1;letter-spacing:-.03em}
+.k span{color:var(--muted);font-size:1em;margin-top:.3em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.k span + span{margin-top:.1em}
+.k .t{color:var(--ink);font-weight:600;font-size:1.1em;margin:0 0 .3em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k .t .zh{color:var(--muted);margin-left:.4em}
+.k.red{box-shadow:inset 0 .55em 0 var(--red)} .k.red b{color:var(--red)}
+.k.amb{box-shadow:inset 0 .55em 0 var(--amber)} .k.amb b{color:var(--amber)}
+.k.ovr{box-shadow:inset 0 .55em 0 var(--over)} .k.ovr b{color:var(--over)}
+.k.calm b{color:var(--ok)}
+.k.zero b{color:var(--muted)}
+.main{display:grid;grid-template-columns:1.55fr 1fr;gap:1.1vw;min-height:0}
+.bottom{display:grid;grid-template-columns:1fr 1fr;gap:1.1vw;min-height:0}
+.panel{background:var(--panel);border:1px solid var(--line);padding:1.2vh 1vw;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.panel h2{font-size:1.35em;font-weight:700;margin-bottom:.8vh;display:flex;align-items:baseline;gap:.6em}
+.panel h2 small{font-size:.75em;color:var(--muted);font-weight:500}
+/* тепловая карта — главный элемент */
+.heat{flex:1;min-height:0;display:grid;gap:3px;align-content:start}
+.heat .h{font-size:.95em;color:var(--muted);text-align:center;font-weight:600;padding-bottom:.2em;line-height:1.1}
+.heat .h.today{color:var(--ink)}
+.heat .h.sun{opacity:.55}
+.heat .s{font-weight:700;font-size:1.15em;display:flex;align-items:center;padding-right:.6em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.heat .c{background:var(--cell);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.6em;min-height:0}
+.heat .c.n1{background:var(--red1);color:var(--red4)}
+.heat .c.n2{background:var(--red2);color:#4A0610}
+.heat .c.n3{background:var(--red3);color:#fff}
+.heat .c.n4{background:var(--red4);color:#fff}
+:root[data-theme="dark"] .heat .c.n1,:root[data-theme="dark"] .heat .c.n2{color:#FFD5DB}
+.heat .c.early{font-style:italic;font-size:1.2em;font-weight:600}
+.heat .c.today{box-shadow:inset 3px 0 0 var(--ink),inset -3px 0 0 var(--ink)}
+.heat .c.low{background:var(--amber1);color:var(--amber);font-size:1.1em;font-weight:700}
+.legend{display:flex;gap:1.2em;color:var(--muted);font-size:.9em;margin-top:.8vh;align-items:center}
+.legend i{display:inline-block;width:1.1em;height:1.1em;vertical-align:-.2em;margin-right:.35em}
+.list{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.it{display:grid;grid-template-columns:4.2em 1fr auto;gap:.2em .9em;padding:.55em 0;border-top:1px solid var(--line);align-items:baseline}
+.it:first-child{border-top:0}
+.it .d{font-weight:800;font-size:1.35em;color:var(--red)}
+.it .d.over{color:var(--over)}
+.it .d.past{font-size:1.05em;font-style:italic}
+.it .cd{font-weight:700;font-size:1.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .cd em{font-style:normal;color:var(--muted);font-weight:500;margin-left:.5em}
+.it .q{font-weight:800;font-size:1.25em;text-align:right}
+.it .q.red{color:var(--red)} .it .q.over{color:var(--over)}
+.it .why{grid-column:2 / 4;color:var(--muted);font-size:.95em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .why.z{margin-top:-.15em}
+.empty{color:var(--muted);font-size:1.2em;padding:2vh 0}
+.empty.good{color:var(--ok);font-weight:700}
+.sup{display:grid;grid-template-columns:auto 1fr auto;gap:.3em .8em;align-items:center}
+.sup .cn{font-weight:700;white-space:nowrap;font-size:.95em}
+.sup .cn b{font-weight:800}
+.sw{display:inline-block;width:.8em;height:.8em;margin:0 .25em 0 .5em;vertical-align:-.05em}
+.sup .n{font-weight:700;white-space:nowrap}
+.bar{display:flex;height:1.25em;background:var(--cell)}
+.bar i{display:block;height:100%}
+.bar i.d{background:var(--red)} .bar i.l{background:var(--amber)} .bar i.o{background:var(--over)}
+.issues .it{grid-template-columns:1fr}
+.issues .it .cd{white-space:normal}
+#setup{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center}
+#setup form{background:var(--panel);border:1px solid var(--line);padding:3vh 2vw;width:min(560px,90vw);display:flex;flex-direction:column;gap:1em;font-size:16px}
+#setup h2{font-size:1.5em}
+#setup label{display:flex;flex-direction:column;gap:.3em;color:var(--muted)}
+#setup input{font:inherit;padding:.6em .7em;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+#setup button{font:inherit;font-weight:700;padding:.7em;border:0;background:var(--ink);color:var(--panel);cursor:pointer}
+#setup p{color:var(--muted);font-size:.9em;line-height:1.4}
+#err{position:fixed;left:1.4vw;bottom:1.2vh;background:var(--red);color:#fff;padding:.5em .9em;font-weight:600;display:none}
+:focus-visible{outline:3px solid var(--over);outline-offset:2px}
+@media (max-width:900px){
+  body{overflow:auto;font-size:14px}
+  .wall{height:auto;grid-template-rows:none}
+  .strip{grid-template-columns:1fr 1fr}
+  .k{border-top:1px solid var(--line)}
+  .main,.bottom{grid-template-columns:1fr}
+  .panel{min-height:40vh}
+}
+</style>
+</head>
+<body>
+<div class="wall" id="wall">
+  <header>
+    <h1>Риски поставок<span class="zh" lang="zh">供货风险</span></h1>
+    <div class="win" id="win">загрузка…</div>
+    <div class="right"><div class="clock" id="clock">--:--</div><div class="upd" id="upd"></div></div>
+  </header>
+  <div class="alerts" id="alerts"></div>
+  <div class="strip" id="strip"></div>
+  <div class="main">
+    <section class="panel"><h2>Когда и у кого не хватает <span class="zh" lang="zh">缺货日历</span><small id="heatSub">кодов с нехваткой на конец дня / 当日结束时缺货零件数</small></h2>
+      <div class="heat" id="heat"></div>
+      <div class="legend"><span><i style="background:var(--red1)"></i>1 код / 1个</span><span><i style="background:var(--red2)"></i>2–3</span>
+        <span><i style="background:var(--red3)"></i>4–6</span><span><i style="background:var(--red4)"></i>7+ </span>
+        <span><i style="background:var(--amber1);box-shadow:inset 0 0 0 1px var(--amber)"></i>ниже страхового / 低于安全库存</span><span><i style="background:var(--cell);box-shadow:inset 3px 0 0 var(--ink),inset -3px 0 0 var(--ink)"></i>сегодня / 今天</span></div>
+    </section>
+    <section class="panel"><h2>Самые срочные <span class="zh" lang="zh">最紧急缺货</span><small id="topSub"></small></h2><div class="list" id="top"></div></section>
+  </div>
+  <div class="bottom">
+    <section class="panel"><h2>Сверхзапас <span class="zh" lang="zh">超储</span><small id="overSub"></small></h2><div class="list" id="over"></div></section>
+    <section class="panel"><h2 id="supTitle">Поставщики <span class="zh" lang="zh">供应商</span></h2><div class="list" id="sup"></div></section>
+  </div>
+</div>
+<div id="setup"><form id="setupForm">
+  <h2>Монитор рисков поставок <span class="zh" lang="zh">供货风险监控</span></h2>
+  <p>Данные берутся из ветки <b>risk</b> репозитория MRP — там их раз в 3 часа обновляет рабочий ПК. Нужен тот же репозиторий и токен, что в пульте; хранятся только в этом браузере.</p>
+  <label>Репозиторий<input id="fRepo" placeholder="slavakam-source/MRP" autocomplete="off"></label>
+  <label>Токен GitHub<input id="fToken" type="password" autocomplete="off"></label>
+  <button type="submit">Показать монитор / 显示</button>
+</form></div>
+<div id="err"></div>
+<script>
+var INLINE = /*__RISK_DATA__*/null;
+(function(){
+var Q = new URLSearchParams(location.search);
+if (Q.get('dark') === '1') document.documentElement.setAttribute('data-theme', 'dark');
+var MIN = Math.max(1, parseInt(Q.get('min') || '5', 10) || 5);
+function $(id){ return document.getElementById(id) }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] }) }
+function ls(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v) } catch (e) { return null } }
+function fmt(n){ return (n == null ? '—' : Math.round(n).toLocaleString('ru-RU')) }
+var WD = ['вс','пн','вт','ср','чт','пт','сб'], WDZ = ['日','一','二','三','四','五','六'];
+function dm(iso){ return iso ? iso.slice(8,10) + '.' + iso.slice(5,7) : '—' }
+function pd(iso){ var p = iso.split('-'); return new Date(+p[0], +p[1]-1, +p[2]) }
+function todayIso(){ var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') }
+function tick(){ var d = new Date(); $('clock').textContent = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') }
+tick(); setInterval(tick, 15000);
+
+var last = null;
+function render(s){
+  last = s;
+  var k = s.kpi || {};
+  $('win').innerHTML = 'окно ' + dm(s.calc) + '–' + dm(s.win_end) + (s.mrp_date && s.mrp_date !== s.calc ? ', расчёт MRP от ' + dm(s.mrp_date) : '') +
+    '<br><span class="zh" lang="zh">窗口期 ' + dm(s.calc) + '–' + dm(s.win_end) + (s.mrp_date && s.mrp_date !== s.calc ? '，MRP计算 ' + dm(s.mrp_date) : '') + '</span>';
+  var g = (s.generated || '').replace('T', ' ');
+  var ageH = g ? (Date.now() - new Date(g.replace(' ', 'T')).getTime()) / 3600000 : null;
+  var upd = $('upd');
+  upd.textContent = 'данные от / 数据时间 ' + dm(g.slice(0,10)) + ' ' + g.slice(11,16);
+  upd.className = 'upd' + (ageH !== null && ageH > 4 ? ' old' : '');
+  // предупреждения
+  var al = '';
+  if (ageH !== null && ageH > 4) al += '<div class="alert stale">Данные не обновлялись ' + Math.round(ageH) + ' ч — проверьте, что рабочий ПК включён (риск-анализ считается на нём каждые 3 часа). <span lang="zh">数据已 ' + Math.round(ageH) + ' 小时未更新，请检查工作电脑是否开机。</span></div>';
+  var wz = s.warnings_zh || [];
+  (s.warnings || []).slice(0, 2).forEach(function(w, i){ al += '<div class="alert">' + esc(w) + (wz[i] ? ' <span class="zh" lang="zh">' + esc(wz[i]) + '</span>' : '') + '</div>' });
+  $('alerts').innerHTML = al;
+  // полоса показателей
+  var fs = (k.first_suppliers || []);
+  var unread = (k.graphs_total || 0) - (k.graphs_read || 0);
+  var tiles = [
+    ['red', 'Дефицит', '缺货', k.deficit || 0, k.deficit ? 'кодов, нехватка до ' + fmt(k.short) + ' шт' : 'в окне дефицита нет', k.deficit ? '最多缺 ' + fmt(k.short) + ' 件' : '无缺货'],
+    ['amb', 'Ниже страхового', '低于安全库存', k.low || 0, 'кодов, без дефицита', '个零件，未缺货'],
+    ['ovr', 'Сверхзапас', '超储', k.over || 0, k.over ? 'сверх макс. +' + fmt(k.excess) + ' шт' : 'выше максимума — нет', k.over ? '超出上限 ' + fmt(k.excess) + ' 件' : '无超储'],
+    ['red', 'Ближайший дефицит', '最近缺货', k.first_deficit ? dm(k.first_deficit) : '—', fs.length ? fs.slice(0,2).join(', ') + (fs.length > 2 ? ' и ещё ' + (fs.length - 2) : '') : (k.early_deficit ? 'дефицит только до сегодня' : 'не ожидается'), fs.length ? '' : (k.early_deficit ? '仅今天之前缺货' : '无')],
+    ['', 'Кодов', '监控零件', k.codes || 0, k.no_snapshot ? 'без снимка остатка: ' + k.no_snapshot : 'у всех есть снимок остатка', k.no_snapshot ? '无盘点数据：' + k.no_snapshot : '均有盘点数据'],
+    ['', 'Графиков', '供货计划', (k.graphs_read || 0) + '/' + (k.graphs_total || 0), unread ? 'не прочитано: ' + unread : 'все прочитаны', unread ? '未读取：' + unread : '全部已读取']
+  ];
+  $('strip').innerHTML = tiles.map(function(t){
+    var zero = t[3] === 0 || t[3] === '—';
+    var cls = 'k ' + (zero ? (t[0] === 'red' ? 'calm zero' : 'zero') : t[0]);
+    return '<div class="' + cls + '"><div class="t">' + esc(t[1]) + '<span class="zh" lang="zh" style="display:inline">' + esc(t[2]) + '</span></div><b>' + esc(typeof t[3] === 'number' ? fmt(t[3]) : t[3]) + '</b><span>' + esc(t[4]) + '</span>' + (t[5] ? '<span lang="zh">' + esc(t[5]) + '</span>' : '') + '</div>';
+  }).join('');
+  // тепловая карта
+  var cal = s.calendar || {days: [], rows: []}, days = cal.days || [], rows = cal.rows || [];
+  var heat = $('heat'), today = todayIso();
+  if (!rows.length) {
+    heat.style.gridTemplateColumns = '1fr';
+    heat.innerHTML = '<div class="empty good">Дефицита и снижения ниже страхового в окне нет ни у одного поставщика.<br><span lang="zh">窗口期内所有供应商均无缺货、无低于安全库存。</span></div>';
+  } else {
+    var maxRows = Math.min(rows.length, 12);
+    heat.style.gridTemplateColumns = 'minmax(6em,1.4fr) 0.8fr repeat(' + days.length + ',1fr)';
+    heat.style.gridTemplateRows = 'auto repeat(' + maxRows + ',minmax(0,1fr))';
+    var h = '<div class="h"></div><div class="h">ранее<br>之前</div>';
+    days.forEach(function(d){ var w = pd(d).getDay(); h += '<div class="h' + (d === today ? ' today' : '') + (w === 0 ? ' sun' : '') + '">' + dm(d) + '<br>' + WD[w] + ' 周' + WDZ[w] + '</div>' });
+    rows.slice(0, maxRows).forEach(function(r){
+      h += '<div class="s" title="' + esc(r.supplier) + '">' + esc(r.supplier) + '</div>';
+      h += cell(r.earlier, ' early', '');
+      r.cells.forEach(function(n, i){
+        var lw = (r.low || [])[i] || 0, td = days[i] === today ? ' today' : '';
+        h += n ? cell(n, td) : (lw ? '<div class="c low' + td + '" title="ниже страхового">' + lw + '</div>' : cell(0, td));
+      });
+    });
+    heat.innerHTML = h;
+    $('heatSub').textContent = 'кодов с нехваткой на конец дня / 当日结束时缺货零件数' + (rows.length > maxRows ? '; показаны 12 из ' + rows.length : '');
+  }
+  function cell(n, extra){ var c = !n ? '' : n === 1 ? ' n1' : n <= 3 ? ' n2' : n <= 6 ? ' n3' : ' n4'; return '<div class="c' + c + extra + '">' + (n || '') + '</div>' }
+  // самые срочные
+  var top = s.top || [];
+  $('topSub').textContent = top.length ? 'по дате дефицита / 按缺货日期' : '';
+  $('top').innerHTML = top.length ? top.map(function(t){
+    var past = t.date && t.date < s.calc;
+    return '<div class="it"><div class="d' + (past ? ' past' : '') + '" title="' + (past ? 'дефицит уже до даты расчёта' : '') + '">' + (past ? 'с ' : '') + dm(t.date) + '</div><div class="cd">' + esc(t.code) + '<em>' + esc(t.supplier) + (t.name ? ', ' + esc(t.name) : '') + '</em></div><div class="q red">−' + fmt(t.short) + '</div><div class="why">' + esc((t.causes || [''])[0]) + '</div>' + ((t.causes_zh || [])[0] ? '<div class="why z" lang="zh">' + esc(t.causes_zh[0]) + '</div>' : '') + '</div>';
+  }).join('') : '<div class="empty good">Срочных дефицитов нет. <span lang="zh">无紧急缺货。</span></div>';
+  // сверхзапас
+  var ov = s.over_top || [];
+  $('overSub').textContent = s.overstock_factor ? 'максимум = страховой × ' + s.overstock_factor + ' / 上限 = 安全库存 × ' + s.overstock_factor : '';
+  $('over').innerHTML = ov.length ? ov.map(function(o){
+    return '<div class="it"><div class="d over" title="с этого дня выше максимума">' + dm(o.first || o.peak_day) + '</div><div class="cd">' + esc(o.code) + '<em>' + esc(o.supplier) + ', пик ' + fmt(o.peak) + ' на ' + dm(o.peak_day) + ' при максимуме ' + fmt(o.max) + '</em></div><div class="q over">+' + fmt(o.excess) + '</div><div class="why">' + esc(o.why || '') + (o.cover ? ', запас ' + o.cover + ' дн.' : '') + '</div>' + (o.why_zh ? '<div class="why z" lang="zh">' + esc(o.why_zh) + (o.cover ? '，可用 ' + o.cover + ' 天' : '') + '</div>' : '') + '</div>';
+  }).join('') : '<div class="empty good">Остатки не превышают максимальный запас. <span lang="zh">库存均未超过上限。</span></div>';
+  // поставщики или нечитаемые графики
+  var sup = s.suppliers || [], gb = s.graphs_bad || [];
+  if (sup.length) {
+    $('supTitle').innerHTML = 'Поставщики <span class="zh" lang="zh">供应商</span><small><i class="sw" style="background:var(--red)"></i>дефицит 缺货<i class="sw" style="background:var(--amber)"></i>ниже страх. 低于安全库存<i class="sw" style="background:var(--over)"></i>сверхзапас 超储</small>';
+    var mx = Math.max.apply(null, sup.map(function(x){ return x.codes || 1 }));
+    $('sup').innerHTML = '<div class="sup">' + sup.slice(0, 9).map(function(x){
+      var w = function(n){ return (100 * n / mx).toFixed(1) + '%' };
+      return '<div class="n">' + esc(x.supplier) + '</div><div class="bar" title="' + esc(x.cause || '') + '"><i class="d" style="width:' + w(x.deficit) + '"></i><i class="l" style="width:' + w(x.low) + '"></i><i class="o" style="width:' + w(x.over) + '"></i></div>' +
+        '<div class="cn"><b style="color:var(--red)">' + (x.deficit || 0) + '</b> / <b style="color:var(--amber)">' + (x.low || 0) + '</b> / <b style="color:var(--over)">' + (x.over || 0) + '</b> из/共 ' + x.codes + '</div>';
+    }).join('') + '</div>' + (gb.length ? '<div class="empty" style="padding:1vh 0 0">Не прочитано графиков / 未读取的供货计划: ' + gb.length + ' — ' + esc(gb.slice(0,3).map(function(g){ return g.file }).join(', ')) + '</div>' : '');
+  } else {
+    $('supTitle').innerHTML = 'Поставщики <span class="zh" lang="zh">供应商</span>';
+    $('sup').innerHTML = '<div class="empty good">Все поставщики в норме. <span lang="zh">所有供应商正常。</span></div>';
+  }
+  setTimeout(fitAll, 0);
+}
+window.addEventListener('resize', function(){ if (last) render(last) });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ if (last) render(last) });
+
+// убрать строки списка, которые не помещаются целиком (обрезанная строка на стене читается хуже)
+function fit(id){
+  var box = $(id); if (!box) return;
+  var lim = box.getBoundingClientRect().bottom;
+  var items = box.querySelectorAll('.it');
+  for (var i = items.length - 1; i > 0; i--) { if (items[i].getBoundingClientRect().bottom > lim + 1) items[i].remove() }
+}
+function fitSup(){
+  var box = document.querySelector('#sup .sup'); if (!box) return;
+  var lim = $('sup').getBoundingClientRect().bottom, k = box.children;
+  for (var i = k.length - 3; i >= 3; i -= 3) {
+    if (k[i].getBoundingClientRect().bottom > lim + 1) { k[i + 2].remove(); k[i + 1].remove(); k[i].remove() }
+  }
+}
+function fitAll(){
+  ['top', 'over'].forEach(fit); fitSup();
+  var lim = $('sup').getBoundingClientRect().bottom;
+  [].slice.call($('sup').querySelectorAll('.empty')).forEach(function(e){ if (e.getBoundingClientRect().bottom > lim + 1) e.remove() });
+}
+function showErr(m){ var e = $('err'); e.textContent = m; e.style.display = m ? 'block' : 'none' }
+
+if (INLINE) {
+  render(INLINE);
+  setTimeout(function(){ location.reload() }, MIN * 60000);
+  return;
+}
+// онлайн-режим: ветка risk через GitHub API
+var repo = ls('mrp_repo') || '', token = ls('mrp_token') || '';
+function load(){
+  fetch('https://api.github.com/repos/' + repo + '/contents/summary.json?ref=risk', {
+    headers: {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.raw'}, cache: 'no-store'
+  }).then(function(r){
+    if (r.status === 401 || r.status === 403) throw new Error('токен не подходит — откройте монитор с ?setup=1');
+    if (r.status === 404) throw new Error('риск-анализ ещё не публиковался в ветку risk');
+    if (!r.ok) throw new Error('GitHub ответил ' + r.status);
+    return r.json();
+  }).then(function(s){ showErr(''); render(s) })
+    .catch(function(e){ showErr('Не удалось обновить: ' + e.message + (last ? ' — показаны прежние данные' : '')) });
+}
+if (!repo || !token || Q.get('setup') === '1') {
+  $('setup').style.display = 'flex';
+  $('fRepo').value = repo || 'slavakam-source/MRP';
+  $('fToken').value = token;
+  $('setupForm').addEventListener('submit', function(ev){
+    ev.preventDefault();
+    repo = $('fRepo').value.trim(); token = $('fToken').value.trim();
+    if (!repo || !token) return;
+    ls('mrp_repo', repo); ls('mrp_token', token);
+    $('setup').style.display = 'none';
+    load(); setInterval(load, MIN * 60000);
+  });
+} else {
+  load(); setInterval(load, MIN * 60000);
+}
+})();
+</script>
+</body>
+</html>
