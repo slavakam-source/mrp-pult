@@ -118,9 +118,20 @@ a{color:var(--run)}
       <h2 style="margin-top:18px">Риски поставок</h2>
       <div class="card" id="riskCard"><div class="empty">Загрузка…</div></div>
       <p class="card hint" style="margin-top:12px;font-size:12.5px;color:var(--muted)">Расчёт идёт в облаке GitHub и занимает несколько минут. Телефон можно заблокировать: статус обновится, когда вернётесь.</p>
+      <h2 style="margin-top:18px">Ручной расчёт → формы заказа</h2>
+      <div class="card">
+        <label class="f" for="manualSupplier">Поставщик</label>
+        <input id="manualSupplier" value="SGK" placeholder="Например SGK или FUYAO" autocomplete="off">
+        <label class="f" for="manualSource">Имя загруженного файла .xlsx</label>
+        <input id="manualSource" placeholder="SGK_Delivery 291026_Ilyina_.xlsx" autocomplete="off">
+        <label class="f" for="manualPeriod">Месяц ГГГГ-ММ (необязательно)</label>
+        <input id="manualPeriod" placeholder="2026-10" autocomplete="off">
+        <p class="hint">Загрузите расчёт через вкладку загрузки или обновите копии с шары на рабочем ПК. Будут созданы месячный заказ, calc и calc_проверка без запуска полного MRP.</p>
+      </div>
+      <button class="btn sec" id="runManualOrders" type="button">Перенести ручной расчёт</button>
       <h2 style="margin-top:18px">Другие операции</h2>
       <div class="grid2">
-        <button class="btn sec" data-act="switch" type="button">Только переключения</button>
+        <button class="btn sec" data-act="switch" type="button">Переключения: BOM, ECU и 2-in-1</button>
         <button class="btn sec" data-act="paint_stats" type="button">Статистика цветов</button>
         <button class="btn sec" data-act="check_inputs" type="button">Проверить входные</button>
         <button class="btn sec" data-act="config_diff" type="button">Справочники</button>
@@ -334,6 +345,13 @@ $('runFull').addEventListener('click',function(){
   dispatch({action:'full',export_orders:$('optOrders').checked,export_graphs:$('optGraphs').checked,graphs_week:S.week,strict:$('optStrict').checked,risk_analysis:$('optRisk').checked,supplier:sel.join(',')},'расчёт MRP');
 });
 document.querySelectorAll('[data-act]').forEach(function(b){b.addEventListener('click',function(){dispatch({action:b.dataset.act},b.textContent.trim())})});
+$('runManualOrders').addEventListener('click',function(){
+  var supplier=$('manualSupplier').value.trim(), source=$('manualSource').value.trim(), period=$('manualPeriod').value.trim();
+  if(!supplier||!source){toast('Укажите поставщика и имя загруженного файла');return;}
+  if(/[\\/:]/.test(source)||!source.toLowerCase().endsWith('.xlsx')){toast('Нужно имя файла .xlsx без пути');return;}
+  if(period&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)){toast('Месяц: ГГГГ-ММ');return;}
+  dispatch({action:'manual_orders',supplier:supplier,manual_source:source,manual_period:period},'перенос ручного расчёта · '+supplier);
+});
 ['optOrders','optGraphs','optStrict'].forEach(function(id){var e=$(id);e.checked=ls('mrp_'+id)==='1';e.addEventListener('change',function(){ls('mrp_'+id,e.checked?'1':'0')})});
 (function(){var e=$('optRisk');e.checked=ls('mrp_optRisk')!=='0';e.addEventListener('change',function(){ls('mrp_optRisk',e.checked?'1':'0')})})();
 $('runSupp').addEventListener('click',function(){
@@ -374,12 +392,13 @@ function saveBlob(blob,name){var u=URL.createObjectURL(blob),a=document.createEl
 function loadFiles(){
   if(needCfg())return;
   gh('/contents/meta.json?ref='+RES_BRANCH,{raw:true,text:true}).then(function(t){
-    var m=JSON.parse(t);$('filesInfo').textContent=(m.rc===0?'ОК · ':'Ошибка · ')+ago(m.finished);
-    var groups={};(m.files||[]).forEach(function(f){var p=f.path.replace(/^files\//,'');var parts=p.split('/');var g=parts.length>1?parts[0]:'Основные результаты';(groups[g]=groups[g]||[]).push({path:f.path,name:parts.slice(-1)[0],sub:parts.length>2?parts.slice(1,-1).join('/'):'',size:f.size,mtime:f.mtime})});
+    var m=JSON.parse(t);$('filesInfo').textContent='Последний запуск: '+(m.rc===0?'успешно · ':'ошибка · ')+ago(m.finished)+(m.commit?' · версия '+m.commit.slice(0,7):'')+(m.schema_version>=2?' · новых файлов: '+(m.generated_files||[]).length:' · даты прежних файлов не подтверждены');
+    var groups={};(m.files||[]).forEach(function(f){var p=f.path.replace(/^files\//,'');var parts=p.split('/');var g=parts.length>1?parts[0]:'Основные результаты';(groups[g]=groups[g]||[]).push({path:f.path,name:parts.slice(-1)[0],sub:parts.length>2?parts.slice(1,-1).join('/'):'',size:f.size,generated:f.provenance==='verified'?f.generated_at:null,current:f.current_run,commit:f.source_commit})});
     var html='';var keys=Object.keys(groups).sort(function(a,b){return a==='Основные результаты'?-1:b==='Основные результаты'?1:a.localeCompare(b,'ru')});
     if(!keys.length)html='<div class="empty">Результатов пока нет. Запустите расчёт.</div>';
     keys.forEach(function(g){html+='<div class="card"><b style="font:600 15px var(--f-head);letter-spacing:.05em;text-transform:uppercase">'+esc(g)+'</b>';
-      groups[g].sort(function(a,b){return a.path.localeCompare(b.path,'ru')}).forEach(function(f){html+='<div class="row"><div class="l"><b>'+esc(f.name)+'</b><span>'+(f.sub?esc(f.sub)+' · ':'')+fmtSize(f.size)+' · '+esc(fmtTime(f.mtime))+'</span></div><button class="btn sm sec" data-dl="'+esc(f.path)+'" data-n="'+esc(f.name)+'" type="button">Скачать</button></div>'});html+='</div>'});
+      groups[g].sort(function(a,b){return a.path.localeCompare(b.path,'ru')}).forEach(function(f){var age=f.generated?(f.current?'Создан этим запуском':'Предыдущий результат')+' · '+fmtTime(f.generated):'Дата расчёта неизвестна';html+='<div class="row"><div class="l"><b>'+esc(f.name)+'</b><span>'+(f.sub?esc(f.sub)+' · ':'')+fmtSize(f.size)+' · '+esc(age)+(f.commit?' · версия '+esc(f.commit.slice(0,7)):'')+'</span></div><button class="btn sm sec" data-dl="'+esc(f.path)+'" data-n="'+esc(f.name)+'" type="button">Скачать</button></div>'});html+='</div>'});
+    if((m.warnings||[]).length)html='<div class="card">'+m.warnings.map(esc).join('<br>')+'</div>'+html;
     $('filesBox').innerHTML=html;
     $('filesBox').querySelectorAll('[data-dl]').forEach(function(b){b.addEventListener('click',function(){download(b.dataset.dl,b.dataset.n)})});
   }).catch(function(e){$('filesBox').innerHTML='<div class="empty">'+(e.status===404?'Результатов ещё нет. Запустите расчёт.':esc(e.message))+'</div>';$('filesInfo').textContent='—'});
