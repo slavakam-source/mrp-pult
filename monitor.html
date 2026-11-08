@@ -7,10 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!--
-  Монитор риск-анализа для большого экрана (одна страница, без прокрутки).
+  Монитор риск-анализа для большого экрана (одна страница с прокруткой длинных списков).
   Два режима:
    1) «Риск-анализ/Монитор.html» — mrp_risk.py вписывает данные прямо в страницу;
-      страница сама перечитывается каждые 5 минут (после авто-риск-анализа раз в 3 ч
+      страница сама перечитывается каждые 5 минут (после ежечасного риск-анализа
       покажет новые цифры). Сеть не нужна.
    2) monitor.html на GitHub Pages (рядом с пультом) — данные берутся из ветки risk
       (summary.json) через GitHub API с тем же репозиторием и токеном, что и в пульте;
@@ -19,23 +19,23 @@
 <style>
 :root{
   --bg:#E6E9ED; --panel:#FFFFFF; --ink:#16233B; --muted:#5E6B7D; --line:#D3D8DF;
-  --red:#C8102E; --red1:#FBE3E6; --red2:#F3A3AE; --red3:#E04A5E; --red4:#9E0B23;
-  --amber:#B57F00; --amber1:#FFF1C7; --over:#2E3FB8; --over1:#DFE3FA; --ok:#1E8C7E; --ok1:#D9F0EC;
+  --red:#C8102E; --red1:#FBE3E6; --red2:#F3A3AE; --red3:#BF3049; --red4:#9E0B23;
+  --amber:#895B00; --amber1:#FFF1C7; --over:#2E3FB8; --over1:#DFE3FA; --ok:#1E8C7E; --ok1:#D9F0EC;
   --cell:#F4F6F9; --head:#16233B; --headink:#FFFFFF;
   --f:"Golos Text","Segoe UI",Roboto,Arial,"Microsoft YaHei","PingFang SC","Noto Sans CJK SC","Noto Sans SC",sans-serif;
 }
 :root[data-theme="dark"]{
   --bg:#0F1726; --panel:#18233A; --ink:#E8EDF5; --muted:#93A1B8; --line:#2A3853;
-  --red:#FF5A6E; --red1:#3A1E2A; --red2:#7A2636; --red3:#C2334A; --red4:#F0546A;
+  --red:#FF5A6E; --red1:#3A1E2A; --red2:#7A2636; --red3:#B62C45; --red4:#A61934;
   --amber:#F2C14E; --amber1:#3A3220; --over:#8E9BFF; --over1:#232C5C; --ok:#4CC6B4; --ok1:#16352F;
   --cell:#1F2B44; --head:#26344F; --headink:#E8EDF5;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f);font-variant-numeric:tabular-nums;
-  overflow:hidden;font-size:clamp(12px,0.9vw,22px)}
-.wall{height:100vh;display:grid;grid-template-rows:auto auto auto minmax(0,1fr) minmax(0,.62fr);gap:1.1vh;padding:1.6vh 1.4vw}
-header{display:flex;align-items:flex-end;gap:2vw}
+  font-size:clamp(13px,0.9vw,22px)}
+.wall{height:100dvh;display:grid;grid-template-rows:auto auto auto minmax(23rem,1fr) minmax(9rem,.48fr);gap:1.1vh;padding:1.6vh 1.4vw}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6em 2vw}
 header h1{font-size:2.6em;font-weight:800;letter-spacing:-.02em;line-height:1}
 header h1 .zh{font-weight:500;color:var(--muted);margin-left:.35em;letter-spacing:0}
 .zh{font-weight:500}
@@ -45,64 +45,68 @@ header .right{margin-left:auto;text-align:right;line-height:1.15}
 header .clock{font-size:2.6em;font-weight:700;letter-spacing:-.02em}
 header .upd{color:var(--muted);font-size:1em}
 header .upd.old{color:var(--amber);font-weight:700}
-.alerts{display:flex;flex-direction:column;gap:.5vh}
+.alerts{display:flex;flex-direction:column;gap:.5vh;max-height:clamp(6rem,16vh,12rem);overflow:auto}
 .alert{background:var(--amber1);color:var(--ink);border-left:.5em solid var(--amber);padding:.5em .9em;font-size:1.02em;line-height:1.3;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  flex:none;overflow-wrap:anywhere}
 .alert.stale{border-left-color:var(--red);background:var(--red1);font-weight:600}
-.strip{display:grid;grid-template-columns:1.15fr 1.25fr 1.1fr 1.2fr .95fr .95fr;background:var(--panel);border:1px solid var(--line)}
-.k{padding:1.2vh 1.1vw;border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;min-width:0}
-.k:first-child{border-left:0}
-.k b{font-size:3.6em;font-weight:800;line-height:1;letter-spacing:-.03em}
-.k span{color:var(--muted);font-size:1em;margin-top:.3em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-.k span + span{margin-top:.1em}
-.k .t{color:var(--ink);font-weight:600;font-size:1.1em;margin:0 0 .3em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.k .t .zh{color:var(--muted);margin-left:.4em}
+.strip{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.18fr) minmax(0,1fr) minmax(0,1.17fr) minmax(0,.9fr) minmax(0,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
+.k{container-type:inline-size;min-width:0;padding:max(12px,1.2vh) max(10px,1.1vw);background:var(--panel);display:grid;grid-row:span 3;grid-template-rows:subgrid;row-gap:0;align-content:start}
+.k b{font-size:min(3.6em,calc(140cqi / var(--value-length)));font-weight:800;line-height:1.05;letter-spacing:-.025em;white-space:nowrap}
+.k .note{color:var(--muted);margin-top:.3em;overflow-wrap:anywhere}
+.k .note span{display:block}
+.k .note span+span{margin-top:.1em}
+.k .t{color:var(--ink);font-weight:600;font-size:1.1em;margin:0 0 .3em;overflow-wrap:anywhere}
+.k .t .zh{display:inline-block;color:var(--muted);margin-left:.4em;white-space:nowrap}
 .k.red{box-shadow:inset 0 .55em 0 var(--red)} .k.red b{color:var(--red)}
 .k.amb{box-shadow:inset 0 .55em 0 var(--amber)} .k.amb b{color:var(--amber)}
 .k.ovr{box-shadow:inset 0 .55em 0 var(--over)} .k.ovr b{color:var(--over)}
 .k.calm b{color:var(--ok)}
 .k.zero b{color:var(--muted)}
-.main{display:grid;grid-template-columns:1.55fr 1fr;gap:1.1vw;min-height:0}
-.bottom{display:grid;grid-template-columns:1fr 1fr;gap:1.1vw;min-height:0}
-.panel{background:var(--panel);border:1px solid var(--line);padding:1.2vh 1vw;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.panel h2{font-size:1.35em;font-weight:700;margin-bottom:.8vh;display:flex;align-items:baseline;gap:.6em}
+.main{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:1.1vw;min-height:0}
+.bottom{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.1vw;min-height:0}
+.panel{background:var(--panel);border:1px solid var(--line);padding:max(10px,1.2vh) max(10px,1vw);display:flex;flex-direction:column;min-width:0;min-height:0}
+.panel h2{font-size:1.35em;font-weight:700;margin-bottom:.8vh;line-height:1.2}
+.panel h2 .zh,.panel h2 small{margin-left:.45em}
 .panel h2 small{font-size:.75em;color:var(--muted);font-weight:500}
 /* тепловая карта — главный элемент */
-.heat{flex:1;min-height:0;display:grid;gap:3px;align-content:start}
-.heat .h{font-size:.95em;color:var(--muted);text-align:center;font-weight:600;padding-bottom:.2em;line-height:1.1}
+.heat-scroll,.list{flex:1;min-height:0;overflow:auto;scrollbar-width:thin}
+.heat{display:grid;gap:3px;align-content:start}
+.heat .s{position:sticky;left:0;z-index:1;background:var(--panel)}
+.heat .h:first-child{left:0;z-index:3}
+.heat .h{position:sticky;top:0;z-index:2;background:var(--panel);font-size:.95em;color:var(--muted);text-align:center;font-weight:600;padding-bottom:.2em;line-height:1.1}
 .heat .h.today{color:var(--ink)}
 .heat .h.sun{opacity:.55}
-.heat .s{font-weight:700;font-size:1.15em;display:flex;align-items:center;padding-right:.6em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.heat .c{background:var(--cell);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.6em;min-height:0}
+.heat .s{align-self:center;font-weight:700;padding-right:.6em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.heat .c{background:var(--cell);display:grid;place-items:center;padding:.12em .25em;min-height:1.4em;
+  font-weight:800;font-size:clamp(14px,1em,22px);line-height:1.15}
 .heat .c.n1{background:var(--red1);color:var(--red4)}
 .heat .c.n2{background:var(--red2);color:#4A0610}
 .heat .c.n3{background:var(--red3);color:#fff}
 .heat .c.n4{background:var(--red4);color:#fff}
 :root[data-theme="dark"] .heat .c.n1,:root[data-theme="dark"] .heat .c.n2{color:#FFD5DB}
-.heat .c.early{font-style:italic;font-size:1.2em;font-weight:600}
+.heat .c.early{font-weight:700}
 .heat .c.today{box-shadow:inset 3px 0 0 var(--ink),inset -3px 0 0 var(--ink)}
-.heat .c.low{background:var(--amber1);color:var(--amber);font-size:1.1em;font-weight:700}
-.legend{display:flex;gap:1.2em;color:var(--muted);font-size:.9em;margin-top:.8vh;align-items:center}
+.heat .c.low{background:var(--amber1);color:var(--amber)}
+.legend{display:flex;flex-wrap:wrap;gap:.35em 1em;color:var(--muted);font-size:.9em;margin-top:.8vh;align-items:center}
 .legend i{display:inline-block;width:1.1em;height:1.1em;vertical-align:-.2em;margin-right:.35em}
-.list{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
-.it{display:grid;grid-template-columns:4.2em 1fr auto;gap:.2em .9em;padding:.55em 0;border-top:1px solid var(--line);align-items:baseline}
+.it{display:grid;grid-template-columns:4.2em minmax(0,1fr) auto;gap:.2em .75em;padding:.55em 0;border-top:1px solid var(--line);align-items:baseline}
 .it:first-child{border-top:0}
 .it .d{font-weight:800;font-size:1.35em;color:var(--red)}
 .it .d.over{color:var(--over)}
 .it .d.past{font-size:1.05em;font-style:italic}
 .it .cd{font-weight:700;font-size:1.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .it .cd em{font-style:normal;color:var(--muted);font-weight:500;margin-left:.5em}
-.it .q{font-weight:800;font-size:1.25em;text-align:right}
+.it .q{font-weight:800;font-size:1.18em;text-align:right;white-space:nowrap}
 .it .q.red{color:var(--red)} .it .q.over{color:var(--over)}
 .it .why{grid-column:2 / 4;color:var(--muted);font-size:.95em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .it .why.z{margin-top:-.15em}
 .empty{color:var(--muted);font-size:1.2em;padding:2vh 0}
 .empty.good{color:var(--ok);font-weight:700}
-.sup{display:grid;grid-template-columns:auto 1fr auto;gap:.3em .8em;align-items:center}
+.sup{display:grid;grid-template-columns:minmax(0,max-content) minmax(1.5em,1fr) auto;gap:.3em .65em;align-items:center}
 .sup .cn{font-weight:700;white-space:nowrap;font-size:.95em}
 .sup .cn b{font-weight:800}
 .sw{display:inline-block;width:.8em;height:.8em;margin:0 .25em 0 .5em;vertical-align:-.05em}
-.sup .n{font-weight:700;white-space:nowrap}
+.sup .n{max-width:13em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar{display:flex;height:1.25em;background:var(--cell)}
 .bar i{display:block;height:100%}
 .bar i.d{background:var(--red)} .bar i.l{background:var(--amber)} .bar i.o{background:var(--over)}
@@ -117,13 +121,24 @@ header .upd.old{color:var(--amber);font-weight:700}
 #setup p{color:var(--muted);font-size:.9em;line-height:1.4}
 #err{position:fixed;left:1.4vw;bottom:1.2vh;background:var(--red);color:#fff;padding:.5em .9em;font-weight:600;display:none}
 :focus-visible{outline:3px solid var(--over);outline-offset:2px}
-@media (max-width:900px){
-  body{overflow:auto;font-size:14px}
+@media (max-width:1150px){
+  .strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:950px), (max-height:760px){
   .wall{height:auto;grid-template-rows:none}
-  .strip{grid-template-columns:1fr 1fr}
-  .k{border-top:1px solid var(--line)}
-  .main,.bottom{grid-template-columns:1fr}
-  .panel{min-height:40vh}
+}
+@media (max-width:950px){
+  body{font-size:14px}
+  .main,.bottom{grid-template-columns:minmax(0,1fr);row-gap:1.1vh}
+}
+@media (max-width:600px){
+  .strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  header h1,header .clock{font-size:2em}
+  header .win{font-size:1em}
+  header .right{text-align:left;margin-left:0}
+  .it{grid-template-columns:minmax(0,1fr) auto}
+  .it .q{grid-column:2;grid-row:1}
+  .it .cd,.it .why{grid-column:1/-1;white-space:normal;overflow-wrap:anywhere}
 }
 </style>
 </head>
@@ -138,21 +153,21 @@ header .upd.old{color:var(--amber);font-weight:700}
   <div class="strip" id="strip"></div>
   <div class="main">
     <section class="panel"><h2>Когда и у кого не хватает <span class="zh" lang="zh">缺货日历</span><small id="heatSub">кодов с нехваткой на конец дня / 当日结束时缺货零件数</small></h2>
-      <div class="heat" id="heat"></div>
+      <div class="heat-scroll" role="region" aria-label="Календарь дефицита" tabindex="0"><div class="heat" id="heat"></div></div>
       <div class="legend"><span><i style="background:var(--red1)"></i>1 код / 1个</span><span><i style="background:var(--red2)"></i>2–3</span>
         <span><i style="background:var(--red3)"></i>4–6</span><span><i style="background:var(--red4)"></i>7+ </span>
         <span><i style="background:var(--amber1);box-shadow:inset 0 0 0 1px var(--amber)"></i>ниже страхового / 低于安全库存</span><span><i style="background:var(--cell);box-shadow:inset 3px 0 0 var(--ink),inset -3px 0 0 var(--ink)"></i>сегодня / 今天</span></div>
     </section>
-    <section class="panel"><h2>Самые срочные <span class="zh" lang="zh">最紧急缺货</span><small id="topSub"></small></h2><div class="list" id="top"></div></section>
+    <section class="panel"><h2>Самые срочные <span class="zh" lang="zh">最紧急缺货</span><small id="topSub"></small></h2><div class="list" id="top" tabindex="0" role="region" aria-label="Срочные дефициты"></div></section>
   </div>
   <div class="bottom">
-    <section class="panel"><h2>Сверхзапас <span class="zh" lang="zh">超储</span><small id="overSub"></small></h2><div class="list" id="over"></div></section>
-    <section class="panel"><h2 id="supTitle">Поставщики <span class="zh" lang="zh">供应商</span></h2><div class="list" id="sup"></div></section>
+    <section class="panel"><h2>Сверхзапас <span class="zh" lang="zh">超储</span><small id="overSub"></small></h2><div class="list" id="over" tabindex="0" role="region" aria-label="Сверхзапасы"></div></section>
+    <section class="panel"><h2 id="supTitle">Поставщики <span class="zh" lang="zh">供应商</span></h2><div class="list" id="sup" tabindex="0" role="region" aria-label="Сводка по поставщикам"></div></section>
   </div>
 </div>
 <div id="setup"><form id="setupForm">
   <h2>Монитор рисков поставок <span class="zh" lang="zh">供货风险监控</span></h2>
-  <p>Данные берутся из ветки <b>risk</b> репозитория MRP — там их раз в 3 часа обновляет рабочий ПК. Нужен тот же репозиторий и токен, что в пульте; хранятся только в этом браузере.</p>
+  <p>Данные берутся из ветки <b>risk</b> репозитория MRP — там их каждый час обновляет рабочий ПК. Нужен тот же репозиторий и токен, что в пульте; хранятся только в этом браузере.</p>
   <label>Репозиторий<input id="fRepo" placeholder="slavakam-source/MRP" autocomplete="off"></label>
   <label>Токен GitHub<input id="fToken" type="password" autocomplete="off"></label>
   <button type="submit">Показать монитор / 显示</button>
@@ -188,7 +203,7 @@ function render(s){
   upd.className = 'upd' + (ageH !== null && ageH > 4 ? ' old' : '');
   // предупреждения
   var al = '';
-  if (ageH !== null && ageH > 4) al += '<div class="alert stale">Данные не обновлялись ' + Math.round(ageH) + ' ч — проверьте, что рабочий ПК включён (риск-анализ считается на нём каждые 3 часа). <span lang="zh">数据已 ' + Math.round(ageH) + ' 小时未更新，请检查工作电脑是否开机。</span></div>';
+  if (ageH !== null && ageH > 4) al += '<div class="alert stale">Данные не обновлялись ' + Math.round(ageH) + ' ч — проверьте, что рабочий ПК включён (риск-анализ считается на нём каждый час). <span lang="zh">数据已 ' + Math.round(ageH) + ' 小时未更新，请检查工作电脑是否开机。</span></div>';
   var wz = s.warnings_zh || [];
   (s.warnings || []).slice(0, 2).forEach(function(w, i){ al += '<div class="alert">' + esc(w) + (wz[i] ? ' <span class="zh" lang="zh">' + esc(wz[i]) + '</span>' : '') + '</div>' });
   $('alerts').innerHTML = al;
@@ -206,7 +221,8 @@ function render(s){
   $('strip').innerHTML = tiles.map(function(t){
     var zero = t[3] === 0 || t[3] === '—';
     var cls = 'k ' + (zero ? (t[0] === 'red' ? 'calm zero' : 'zero') : t[0]);
-    return '<div class="' + cls + '"><div class="t">' + esc(t[1]) + '<span class="zh" lang="zh" style="display:inline">' + esc(t[2]) + '</span></div><b>' + esc(typeof t[3] === 'number' ? fmt(t[3]) : t[3]) + '</b><span>' + esc(t[4]) + '</span>' + (t[5] ? '<span lang="zh">' + esc(t[5]) + '</span>' : '') + '</div>';
+    var value = typeof t[3] === 'number' ? fmt(t[3]) : String(t[3]);
+    return '<div class="' + cls + '"><div class="t">' + esc(t[1]) + '<span class="zh" lang="zh">' + esc(t[2]) + '</span></div><b style="--value-length:' + value.length + '">' + esc(value) + '</b><div class="note"><span>' + esc(t[4]) + '</span>' + (t[5] ? '<span lang="zh">' + esc(t[5]) + '</span>' : '') + '</div></div>';
   }).join('');
   // тепловая карта
   var cal = s.calendar || {days: [], rows: []}, days = cal.days || [], rows = cal.rows || [];
@@ -216,8 +232,8 @@ function render(s){
     heat.innerHTML = '<div class="empty good">Дефицита и снижения ниже страхового в окне нет ни у одного поставщика.<br><span lang="zh">窗口期内所有供应商均无缺货、无低于安全库存。</span></div>';
   } else {
     var maxRows = Math.min(rows.length, 12);
-    heat.style.gridTemplateColumns = 'minmax(6em,1.4fr) 0.8fr repeat(' + days.length + ',1fr)';
-    heat.style.gridTemplateRows = 'auto repeat(' + maxRows + ',minmax(0,1fr))';
+    heat.style.gridTemplateColumns = 'minmax(10em,1.65fr) minmax(3.35em,.8fr)' +
+      (days.length ? ' repeat(' + days.length + ',minmax(3.35em,1fr))' : '');
     var h = '<div class="h"></div><div class="h">ранее<br>之前</div>';
     days.forEach(function(d){ var w = pd(d).getDay(); h += '<div class="h' + (d === today ? ' today' : '') + (w === 0 ? ' sun' : '') + '">' + dm(d) + '<br>' + WD[w] + ' 周' + WDZ[w] + '</div>' });
     rows.slice(0, maxRows).forEach(function(r){
@@ -259,29 +275,6 @@ function render(s){
     $('supTitle').innerHTML = 'Поставщики <span class="zh" lang="zh">供应商</span>';
     $('sup').innerHTML = '<div class="empty good">Все поставщики в норме. <span lang="zh">所有供应商正常。</span></div>';
   }
-  setTimeout(fitAll, 0);
-}
-window.addEventListener('resize', function(){ if (last) render(last) });
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ if (last) render(last) });
-
-// убрать строки списка, которые не помещаются целиком (обрезанная строка на стене читается хуже)
-function fit(id){
-  var box = $(id); if (!box) return;
-  var lim = box.getBoundingClientRect().bottom;
-  var items = box.querySelectorAll('.it');
-  for (var i = items.length - 1; i > 0; i--) { if (items[i].getBoundingClientRect().bottom > lim + 1) items[i].remove() }
-}
-function fitSup(){
-  var box = document.querySelector('#sup .sup'); if (!box) return;
-  var lim = $('sup').getBoundingClientRect().bottom, k = box.children;
-  for (var i = k.length - 3; i >= 3; i -= 3) {
-    if (k[i].getBoundingClientRect().bottom > lim + 1) { k[i + 2].remove(); k[i + 1].remove(); k[i].remove() }
-  }
-}
-function fitAll(){
-  ['top', 'over'].forEach(fit); fitSup();
-  var lim = $('sup').getBoundingClientRect().bottom;
-  [].slice.call($('sup').querySelectorAll('.empty')).forEach(function(e){ if (e.getBoundingClientRect().bottom > lim + 1) e.remove() });
 }
 function showErr(m){ var e = $('err'); e.textContent = m; e.style.display = m ? 'block' : 'none' }
 
