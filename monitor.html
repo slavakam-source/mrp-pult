@@ -43,6 +43,7 @@ span.zh,small.zh{color:var(--muted)}
 header .win{font-size:1.25em;color:var(--muted);font-weight:500;padding-bottom:.25em}
 header .right{margin-left:auto;text-align:right;line-height:1.15}
 header .clock{font-size:2.6em;font-weight:700;letter-spacing:-.02em}
+header .xls{display:inline-block;margin-top:.35em;padding:.25em .7em;border:1px solid var(--muted);border-radius:.4em;color:inherit;text-decoration:none;font-size:.95em;cursor:pointer}header .xls:hover{background:rgba(127,127,127,.12)}@media print{header .xls{display:none}}
 header .upd{color:var(--muted);font-size:1em}
 header .upd.old{color:var(--amber);font-weight:700}
 .alerts{display:flex;flex-direction:column;gap:.5vh;max-height:clamp(6rem,16vh,12rem);overflow:auto}
@@ -150,7 +151,7 @@ header .upd.old{color:var(--amber);font-weight:700}
   <header>
     <h1>Риски поставок<span class="zh" lang="zh">供货风险</span></h1>
     <div class="win" id="win">загрузка…</div>
-    <div class="right"><div class="clock" id="clock">--:--</div><div class="upd" id="upd"></div></div>
+    <div class="right"><div class="clock" id="clock">--:--</div><div class="upd" id="upd"></div><a class="xls" id="xls" href="Риск_анализ_последний.xlsx" download title="Полный отчёт риск-анализа: дефициты, все коды, остаток по дням, поставки, графики">⬇ Excel с подробностями</a></div>
   </header>
   <div class="alerts" id="alerts"></div>
   <div class="strip" id="strip"></div>
@@ -287,6 +288,24 @@ function render(s){
     $('sup').innerHTML = '<div class="empty good">Все поставщики в норме. <span lang="zh">所有供应商正常。</span></div>';
   }
 }
+// Excel с подробностями: в онлайн-режиме — Риск_анализ_последний.xlsx из ветки risk через GitHub API
+function downloadXlsx(ev){
+  if (INLINE) return;                      // локальный монитор: файл лежит рядом, работает обычная ссылка
+  ev.preventDefault();
+  var a = $('xls'), label = a.textContent; a.textContent = 'скачивание…';
+  fetch('https://api.github.com/repos/' + repo + '/contents/' + encodeURIComponent('Риск_анализ_последний.xlsx') + '?ref=risk', {
+    headers: {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.raw'}, cache: 'no-store'
+  }).then(function(r){
+    if (!r.ok) throw new Error(r.status === 404 ? 'отчёт ещё не опубликован' : 'GitHub ответил ' + r.status);
+    return r.blob();
+  }).then(function(b){
+    var u = URL.createObjectURL(b), t = document.createElement('a');
+    var stamp = (last && last.generated ? String(last.generated).slice(0, 16).replace(/[-:T]/g, '') : 'последний');
+    t.href = u; t.download = 'Риск_анализ_' + stamp + '.xlsx'; document.body.appendChild(t); t.click();
+    setTimeout(function(){ URL.revokeObjectURL(u); t.remove() }, 1000);
+    a.textContent = label;
+  }).catch(function(e){ a.textContent = label; showErr('Excel не скачан: ' + e.message) });
+}
 function showErr(m){ var e = $('err'); e.textContent = m; e.style.display = m ? 'block' : 'none' }
 
 if (INLINE) {
@@ -296,6 +315,7 @@ if (INLINE) {
 }
 // онлайн-режим: ветка risk через GitHub API
 var repo = ls('mrp_repo') || '', token = ls('mrp_token') || '';
+$('xls').addEventListener('click', downloadXlsx);
 function load(){
   fetch('https://api.github.com/repos/' + repo + '/contents/summary.json?ref=risk', {
     headers: {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.raw'}, cache: 'no-store'
