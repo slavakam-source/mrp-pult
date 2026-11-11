@@ -273,6 +273,10 @@ function render(s){
   $('over').innerHTML = ov.length ? ov.map(function(o){
     return '<div class="it"><div class="d over" title="с этого дня выше максимума">' + dm(o.first || o.peak_day) + '</div><div class="cd">' + esc(o.code) + '<em>' + esc(o.supplier) + ', пик ' + fmt(o.peak) + ' на ' + dm(o.peak_day) + ' при максимуме ' + fmt(o.max) + '</em></div><div class="q over">+' + fmt(o.excess) + '</div><div class="why">' + esc(o.why || '') + (o.cover ? ', запас ' + o.cover + ' дн.' : '') + '</div>' + (o.why_zh ? '<div class="why z" lang="zh">' + esc(o.why_zh) + (o.cover ? '，可用 ' + o.cover + ' 天' : '') + '</div>' : '') + '</div>';
   }).join('') : '<div class="empty good">Остатки не превышают максимальный запас. <span lang="zh">库存均未超过上限。</span></div>';
+  var manual = Object.entries(s.specialist_comments || {}).concat(Object.entries(s.specialist_code_comments || {}));
+  var manualHTML = manual.length ? '<details style="margin-top:.5em"><summary>Комментарии специалистов (' + manual.length +
+    ')</summary>' + manual.map(function(x){return '<div class="why"><b>' + esc(x[0]) + '</b> · ' +
+    esc((x[1] || []).join(' · ')) + '</div>'}).join('') + '</details>' : '';
   // поставщики или нечитаемые графики
   var sup = s.suppliers || [], gb = s.graphs_bad || [];
   if (sup.length) {
@@ -287,6 +291,7 @@ function render(s){
     $('supTitle').innerHTML = 'Поставщики <span class="zh" lang="zh">供应商</span>';
     $('sup').innerHTML = '<div class="empty good">Все поставщики в норме. <span lang="zh">所有供应商正常。</span></div>';
   }
+  if (manualHTML) $('sup').insertAdjacentHTML('afterbegin', manualHTML);
 }
 // Excel с подробностями: в онлайн-режиме — Риск_анализ_последний.xlsx из ветки risk через GitHub API
 function downloadXlsx(ev){

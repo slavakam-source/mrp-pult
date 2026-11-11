@@ -605,6 +605,14 @@ function loadRisk(){
      }
      (s.suppliers||[]).filter(function(x){return x.deficit}).slice(0,8).forEach(function(x){
       h+='<div class="row"><div class="l"><b>'+esc(x.supplier)+' — '+x.deficit+' код(ов)</b><span>с '+esc(dm(x.first))+' · '+esc(x.cause||'')+'</span></div></div>'});
+    var manual=Object.entries(s.specialist_comments||{}).concat(Object.entries(s.specialist_code_comments||{}));
+    if(manual.length){
+      h+='<details style="margin-top:8px"><summary>Комментарии специалистов ('+manual.length+')</summary>';
+      manual.forEach(function(x){
+        h+='<div class="row"><div class="l"><b>'+esc(x[0])+'</b><span>'+esc((x[1]||[]).join(' · '))+'</span></div></div>';
+      });
+      h+='</details>';
+    }
     var top=(s.top||[]).slice(0,10);
     if(top.length){h+='<details style="margin-top:8px"><summary style="cursor:pointer">Самые срочные коды ('+top.length+')</summary>';
       top.forEach(function(t){h+='<div class="row"><div class="l"><b>'+esc(dm(t.date))+' · '+esc(t.code)+'</b><span>'+esc(t.supplier||'')+' · −'+(t.short||0)+' шт · '+esc((t.causes||[''])[0])+'</span></div></div>'});
