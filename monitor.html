@@ -49,6 +49,9 @@ header .upd.old{color:var(--amber);font-weight:700}
 .alert{background:var(--amber1);color:var(--ink);border-left:.5em solid var(--amber);padding:.5em .9em;font-size:1.02em;line-height:1.3;
   flex:none;overflow-wrap:anywhere}
 .alert.stale{border-left-color:var(--red);background:var(--red1);font-weight:600}
+.alert.forecast{display:block;flex:none;background:#e5edf9;border-color:#385d91;color:#152947;white-space:normal}
+.alerts:has(.forecast){min-height:3.8em}
+@media(max-width:500px){.alerts:has(.forecast){min-height:4.8em}}
 .strip{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.18fr) minmax(0,1fr) minmax(0,1.17fr) minmax(0,.9fr) minmax(0,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
 .k{container-type:inline-size;min-width:0;padding:max(12px,1.2vh) max(10px,1.1vw);background:var(--panel);display:grid;grid-row:span 3;grid-template-rows:subgrid;row-gap:0;align-content:start}
 .k b{font-size:min(3.6em,calc(140cqi / var(--value-length)));font-weight:800;line-height:1.05;letter-spacing:-.025em;white-space:nowrap}
@@ -203,7 +206,15 @@ function render(s){
   upd.className = 'upd' + (ageH !== null && ageH > 4 ? ' old' : '');
   // предупреждения
   var al = '';
-  if (ageH !== null && ageH > 4) al += '<div class="alert stale">Данные не обновлялись ' + Math.round(ageH) + ' ч — проверьте, что рабочий ПК включён (риск-анализ считается на нём каждый час). <span lang="zh">数据已 ' + Math.round(ageH) + ' 小时未更新，请检查工作电脑是否开机。</span></div>';
+  var beyond = s.beyond_graph || [];
+  if (beyond.length) {
+    var total = beyond.reduce(function(a, r){ return a + (r.codes || 0); }, 0);
+    var risks = beyond.reduce(function(a, r){ return a + (r.risks || 0); }, 0);
+    var missing = beyond.reduce(function(a, r){ return a + (r.no_data || 0); }, 0);
+    al += '<div class="alert forecast"><b>За горизонтом графиков / 超出供货计划范围</b> · кодов ' +
+      fmt(total) + ' · рисков ' + fmt(risks) + ' · без данных ' + fmt(missing) + '</div>';
+  }
+  if (ageH !== null && ageH > 4) al += '<div class="alert stale">Данные не обновлялись ' + Math.round(ageH) + ' ч. Проверьте последний расчёт и публикацию. <span lang="zh">数据已 ' + Math.round(ageH) + ' 小时未更新，请检查最近一次计算和发布。</span></div>';
   var wz = s.warnings_zh || [];
   (s.warnings || []).slice(0, 2).forEach(function(w, i){ al += '<div class="alert">' + esc(w) + (wz[i] ? ' <span class="zh" lang="zh">' + esc(wz[i]) + '</span>' : '') + '</div>' });
   $('alerts').innerHTML = al;

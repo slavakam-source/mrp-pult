@@ -590,7 +590,20 @@ function loadRisk(){
     h+='<div class="grid2" style="margin:6px 0 4px;grid-template-columns:1fr 1fr 1fr"><div><b style="font:600 26px var(--f-head);color:'+(k.deficit?'var(--bad)':'var(--ok)')+'">'+(k.deficit||0)+'</b><br><span class="hint">дефицит в окне · ближайший '+esc(dm(k.first_deficit))+'</span></div>'+
        '<div><b style="font:600 26px var(--f-head);color:'+(k.low?'var(--warn)':'var(--ok)')+'">'+(k.low||0)+'</b><br><span class="hint">ниже страхового</span></div>'+
        '<div><b style="font:600 26px var(--f-head);color:'+(k.over?'#4f5fd6':'var(--ok)')+'">'+(k.over||0)+'</b><br><span class="hint">сверхзапас'+(k.over?' · +'+(k.excess||0).toLocaleString('ru-RU')+' шт':'')+'</span></div></div>';
-    (s.suppliers||[]).filter(function(x){return x.deficit}).slice(0,8).forEach(function(x){
+    var beyond=s.beyond_graph||[];
+     if(beyond.length){
+       var total=beyond.reduce(function(a,x){return a+(x.codes||0);},0);
+       var risks=beyond.reduce(function(a,x){return a+(x.risks||0);},0);
+       var missing=beyond.reduce(function(a,x){return a+(x.no_data||0);},0);
+       h+='<details style="margin-top:8px"><summary><b>За горизонтом графиков</b> · '+
+         total+' кодов · '+risks+' рисков · '+missing+' без данных</summary>';
+       beyond.forEach(function(x){
+         h+='<div class="row"><div class="l"><b>'+esc(x.supplier)+'</b><span>график до '+esc(dm(x.end))+
+            ' · кодов '+(x.codes||0)+' · рисков '+(x.risks||0)+' · без данных '+(x.no_data||0)+'</span></div></div>';
+       });
+       h+='</details>';
+     }
+     (s.suppliers||[]).filter(function(x){return x.deficit}).slice(0,8).forEach(function(x){
       h+='<div class="row"><div class="l"><b>'+esc(x.supplier)+' — '+x.deficit+' код(ов)</b><span>с '+esc(dm(x.first))+' · '+esc(x.cause||'')+'</span></div></div>'});
     var top=(s.top||[]).slice(0,10);
     if(top.length){h+='<details style="margin-top:8px"><summary style="cursor:pointer">Самые срочные коды ('+top.length+')</summary>';
