@@ -89,6 +89,10 @@ pre.log .e{color:#ff8a8a} pre.log .w{color:#f0c36a}
 .sheet .in{background:var(--panel);width:100%;max-width:640px;border-radius:16px 16px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px));max-height:92%;overflow:auto}
 .empty{color:var(--muted);text-align:center;padding:18px 8px}
 a{color:var(--run)}
+
+.system-health{padding:.5em .9em;white-space:normal;line-height:1.35}
+.system-bad{color:var(--bad);font-weight:700}
+
 </style>
 </head>
 <body>
@@ -569,10 +573,75 @@ $('logBack').addEventListener('click',function(){$('logView').hidden=true;$('run
 $('logFilter').addEventListener('click',function(){S.logFilter=!S.logFilter;this.setAttribute('aria-pressed',S.logFilter);this.textContent=S.logFilter?'Весь лог':'Только ошибки';renderLog()});
 
 /* ── Старт ────────────────────────────────────────────────── */
+/* system-health: shared by the standalone monitor and the MRP pult */
+function renderSystemHealth(summary, manifests, now){
+  var system=summary.system;
+  if(!system)return '';
+  var hour=3600000, offset=(system.timezone_offset_hours==null?3:system.timezone_offset_hours)*hour;
+  var local=new Date(now+offset).toISOString(), day=local.slice(0,10), slots=system.workday_slots||[];
+  var weekday=new Date(day+'T00:00:00Z').getUTCDay();
+  var workday=(system.workdays||[]).includes(day)||weekday>0&&weekday<6&&!(system.holidays||[]).includes(day);
+  function when(iso){
+    if(!iso)return NaN;
+    return /(?:Z|[+-]\d\d:\d\d)$/.test(iso)?Date.parse(iso):Date.parse(iso+'Z')-offset;
+  }
+  function display(at){
+    if(!Number.isFinite(at))return '—';
+    var text=new Date(at+offset).toISOString();
+    return text.slice(8,10)+'.'+text.slice(5,7)+' '+text.slice(11,16);
+  }
+  function slotAt(slot){return when(day+'T'+slot)}
+  var start=slots.length?slotAt(slots[0]):Infinity, end=slots.length?slotAt(slots[slots.length-1]):-Infinity;
+  var working=workday&&now>=start&&now<=end, limit=(system.alert_minutes||120)*60000;
+  function observed(saved, channel){
+    var previous=when(saved), current=(manifests||{})[channel];
+    var live=current&&/^RUTL-/i.test(current.host||'')?when(current.updated):NaN;
+    return Number.isFinite(live)?Math.max(live,Number.isFinite(previous)?previous:live):previous;
+  }
+  function isLate(at){return working&&now-Math.max(start,Number.isFinite(at)?at:start)>limit}
+  var heartbeat=observed(system.rutl_heartbeat,'pc-status');
+  var uploads=['graphs','data'].map(function(channel){
+    var at=observed((system.rutl_uploads||{})[channel],channel);
+    var late=isLate(at);
+    return '<span'+(late?' class="system-bad"':'')+'>'+(channel==='graphs'?'графики ':'данные ')+display(at)+'</span>';
+  });
+  var records=(system.recent_cloud_runs||[]).filter(function(run){return (run.completed_at||'').slice(0,10)===day});
+  var last=when((system.last_cloud_run||{}).completed_at);
+  var delays=records.filter(function(run){return Number.isFinite(run.delay_minutes)}).map(function(run){return run.delay_minutes});
+  var uncovered=slots.map(slotAt).find(function(at){return !Number.isFinite(last)||at>last});
+  var lateCloud=working&&system.schedule_enabled!==false&&now-uncovered>limit;
+  var inputs=summary.inputs||system.input_health;
+  var inputText=inputs?' · входы <span'+(inputs.red?' class="system-bad"':'')+'>зел. '+(Number(inputs.green)||0)+
+    ', жёлт. '+(Number(inputs.yellow)||0)+', красн. '+(Number(inputs.red)||0)+'</span>':' · входы —';
+  return '<div class="system-health"><b>Система</b> · облако сегодня '+records.length+
+    (delays.length?' · опоздание '+delays.join(', ')+' мин':'')+' · последний отчёт '+display(last)+
+    ' · полный MRP '+display(when(system.last_full_mrp))+'<br>RUTL · сигнал '+display(heartbeat)+' · '+uploads.join(' · ')+inputText+
+    (lateCloud?'<div class="system-bad">После слота более 2 ч без нового облачного отчёта.</div>':'')+
+    (isLate(heartbeat)?'<div class="system-bad">RUTL: более 2 ч без сигнала в рабочее время.</div>':'')+'</div>';
+}
+/* end system-health */
+var riskManifests={}, riskSystemSummary=null;
+setInterval(refreshSystemHealth, 60000);
+setInterval(function(){if(!document.hidden&&S.repo&&S.token)refreshHealthSources()}, 300000);
+function refreshHealthSources(){
+  ['graphs','data','pc-status'].forEach(function(ref){
+    gh('/contents/manifest.json?ref='+ref,{raw:true,text:true}).then(function(t){
+      riskManifests[ref]=JSON.parse(t);refreshSystemHealth();
+    }).catch(function(){});
+  });
+  gh('/contents/summary.json?ref=risk',{raw:true,text:true}).then(function(t){
+    riskSystemSummary=JSON.parse(t);refreshSystemHealth();
+  }).catch(function(){});
+}
+function refreshSystemHealth(){
+  var el=$('riskSystem');
+  if(el&&riskSystemSummary)el.innerHTML=renderSystemHealth(riskSystemSummary,riskManifests,Date.now());
+}
 function loadBranchInfo(id,ref,title,stale,none){
   var el=$(id);if(!el)return;
   gh('/contents/manifest.json?ref='+ref,{raw:true,text:true}).then(function(t){
     var m=JSON.parse(t),n=Object.keys(m.files||{}).length,u=(m.updated||'').replace('T',' ').slice(0,16);
+    riskManifests[ref]=m;refreshSystemHealth();
     var d=u?new Date(u.replace(' ','T')):null,age=d?Math.round((Date.now()-d.getTime())/3600000):null;
     el.textContent=title+': '+n+' файл(ов), обновлены '+(u?u.slice(8,10)+'.'+u.slice(5,7)+' '+u.slice(11):'—')+
       (stale&&age!==null&&age>stale?' — давно не обновлялись, проверьте рабочий ПК':'')+
@@ -587,6 +656,8 @@ function loadRisk(){
     var age=g?Math.round((Date.now()-new Date(g.replace(' ','T')).getTime())/3600000):null;
     var h='<div class="row" style="border-top:0;padding-top:0"><div class="l"><b>Обновлено '+esc(dm(g.slice(0,10))+' '+g.slice(11,16))+'</b><span>Окно '+esc(dm(s.calc))+'–'+esc(dm(s.win_end))+(s.mrp_date&&s.mrp_date!==s.calc?' · расчёт MRP от '+esc(dm(s.mrp_date)):'')+(age!==null&&age>6?' · давно не обновлялось, проверьте рабочий ПК':'')+'</span></div>'+
       '<button class="btn sm sec" id="riskDl" type="button">Отчёт</button></div>';
+    riskSystemSummary=s;
+    h+='<div id="riskSystem">'+renderSystemHealth(s,riskManifests,Date.now())+'</div>';
     (s.warnings||[]).slice(0,2).forEach(function(w){h+='<div class="hint" style="color:var(--warn);margin:4px 0">⚠ '+esc(w)+'</div>'});
     h+='<div class="grid2" style="margin:6px 0 4px;grid-template-columns:1fr 1fr 1fr"><div><b style="font:600 26px var(--f-head);color:'+(k.deficit?'var(--bad)':'var(--ok)')+'">'+(k.deficit||0)+'</b><br><span class="hint">дефицит в окне · ближайший '+esc(dm(k.first_deficit))+'</span></div>'+
        '<div><b style="font:600 26px var(--f-head);color:'+(k.low?'var(--warn)':'var(--ok)')+'">'+(k.low||0)+'</b><br><span class="hint">ниже страхового</span></div>'+
@@ -625,10 +696,13 @@ function loadRisk(){
     h+='<a class="btn sm sec" style="margin-top:8px;display:inline-block;text-decoration:none" href="monitor.html" target="_blank" rel="noopener">Монитор для большого экрана</a>';
     box.innerHTML=h;
     $('riskDl').addEventListener('click',function(){download('Риск_анализ_последний.xlsx','Риск_анализ_'+(s.generated||'').slice(0,10)+'.xlsx','risk')});
-  }).catch(function(e){box.innerHTML='<div class="empty">'+(e.status===404?'Риск-анализ ещё не публиковался. Он считается на рабочем ПК каждые 3 часа (галочка «автоматически каждые 3 ч»).':'Не удалось загрузить: '+esc(e.message))+'</div>'});
+  }).catch(function(e){box.innerHTML='<div class="empty">'+(e.status===404?'Риск-анализ ещё не публиковался. Проверьте состояние расчёта по расписанию.':'Не удалось загрузить: '+esc(e.message))+'</div>'});
 }
 function loadGraphsInfo(){
   loadRisk();
+  gh('/contents/manifest.json?ref=pc-status',{raw:true,text:true}).then(function(t){
+    riskManifests['pc-status']=JSON.parse(t);refreshSystemHealth();
+  }).catch(function(){});
   loadBranchInfo('graphsInfo','graphs','Графики с шары',6,'Графики с шары ещё не отправлялись на GitHub — расчёт берёт графики из «Ручные графики».');
   loadBranchInfo('dataInfo','data','Входные данные с рабочего ПК',0,'Входные данные с рабочего ПК ещё не отправлялись — расчёт берёт данные из репозитория.');
 }
@@ -636,7 +710,7 @@ function init(force){
   $('repoLabel').textContent=S.repo?S.repo:'не настроено';
   if(!S.token||!S.repo){renderStatus(null);return}
   refreshRuns();loadSuppliers();loadGraphsInfo();
-  document.addEventListener('visibilitychange',function(){if(!document.hidden)refreshRuns()});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden){refreshRuns();loadGraphsInfo()}});
 }
 S.repo=ls('mrp_repo')||'slavakam-source/MRP';S.token=ls('mrp_token')||'';
 var w=ls('mrp_week');if(w==='current'){S.week='current';document.querySelectorAll('#segWeek button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v==='current')})}
