@@ -421,6 +421,48 @@ if (!repo || !token || Q.get('setup') === '1') {
   load(); setInterval(load, MIN * 60000);
 }
 })();
+/* auto-scroll: медленная прокрутка окон, где позиции не помещаются (12.11.2026).
+   ?scroll=0 — выключить, ?speed=пикс/с (по умолчанию 18). Пауза 4 с наверху и внизу,
+   под мышью / касанием окно не прокручивается. */
+(function(){
+  var Q = new URLSearchParams(location.search);
+  if (Q.get('scroll') === '0') return;
+  var SPEED = Math.max(4, parseFloat(Q.get('speed') || '18') || 18), PAUSE = 4000;
+  var SEL = '.scroll,.list,.heat-scroll,.alerts';
+  var state = new WeakMap(), lastT = performance.now();
+  function st(el){
+    var s = state.get(el);
+    if (!s) {
+      s = {pos: el.scrollTop, wait: performance.now() + PAUSE, hold: false};
+      el.addEventListener('mouseenter', function(){ s.hold = true });
+      el.addEventListener('mouseleave', function(){ s.hold = false; s.pos = el.scrollTop; s.wait = performance.now() + PAUSE });
+      el.addEventListener('touchstart', function(){ s.hold = true; s.wait = performance.now() + 15000 }, {passive: true});
+      el.addEventListener('touchend', function(){ s.hold = false; s.pos = el.scrollTop }, {passive: true});
+      el.addEventListener('wheel', function(){ s.pos = el.scrollTop; s.wait = performance.now() + 10000 }, {passive: true});
+      state.set(el, s);
+    }
+    return s;
+  }
+  function frame(t){
+    var dt = Math.min(100, t - lastT); lastT = t;
+    document.querySelectorAll(SEL).forEach(function(el){
+      var max = el.scrollHeight - el.clientHeight;
+      if (max <= 4) return;
+      var s = st(el);
+      if (s.hold || t < s.wait) return;
+      if (Math.abs(el.scrollTop - s.pos) > 2) s.pos = el.scrollTop;   // окно перерисовали — продолжить с места
+      s.pos += SPEED * dt / 1000;
+      if (s.pos >= max) { s.pos = max; el.scrollTop = max; s.wait = t + PAUSE; s.back = true; return; }
+      el.scrollTop = s.pos;
+    });
+    document.querySelectorAll(SEL).forEach(function(el){
+      var s = state.get(el);
+      if (s && s.back && t >= s.wait) { s.back = false; s.pos = 0; el.scrollTop = 0; s.wait = t + PAUSE }
+    });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>

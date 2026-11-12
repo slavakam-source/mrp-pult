@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Переключения — монитор</title>
+<style>
+:root{
+  --bg:#E6E9ED; --panel:#FFFFFF; --ink:#16233B; --muted:#5E6B7D; --line:#D3D8DF;
+  --red:#C8102E; --red1:#FBE3E6; --amber:#895B00; --amber1:#FFF1C7; --over:#2E3FB8; --over1:#DFE3FA;
+  --ok:#1E8C7E; --ok1:#D9F0EC; --cell:#F4F6F9; --grey1:#ECEEF2;
+  --f:"Golos Text","Segoe UI",Roboto,Arial,"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+}
+:root[data-theme="dark"]{
+  --bg:#0F1726; --panel:#18233A; --ink:#E8EDF5; --muted:#93A1B8; --line:#2A3853;
+  --red:#FF5A6E; --red1:#3A1E2A; --amber:#F2C14E; --amber1:#3A3220; --over:#8E9BFF; --over1:#232C5C;
+  --ok:#4CC6B4; --ok1:#16352F; --cell:#1F2B44; --grey1:#22304A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f);font-variant-numeric:tabular-nums;font-size:clamp(13px,0.85vw,21px)}
+.wall{height:100dvh;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:1.1vh;padding:1.6vh 1.4vw}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6em 2vw}
+header h1{font-size:2.6em;font-weight:800;letter-spacing:-.02em;line-height:1}
+header h1 .zh{font-weight:500;color:var(--muted);margin-left:.35em}
+header .win{font-size:1.2em;color:var(--muted)}
+header .right{margin-left:auto;text-align:right;line-height:1.15}
+header .clock{font-size:2.6em;font-weight:700}
+header .upd{color:var(--muted)}
+.strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.6vw}
+.k{background:var(--panel);border-top:.35em solid var(--line);padding:.7em .9em}
+.k .t{font-weight:600}
+.k .v{font-size:2.6em;font-weight:800;line-height:1.05;margin:.1em 0}
+.k .n{color:var(--muted);font-size:.9em}
+.k.red{border-color:var(--red)} .k.red .v{color:var(--red)}
+.k.amber{border-color:var(--amber)} .k.amber .v{color:var(--amber)}
+.k.blue{border-color:var(--over)} .k.blue .v{color:var(--over)}
+.panel{background:var(--panel);padding:.8em 1em;display:flex;flex-direction:column;min-height:0}
+.panel h2{font-size:1.35em;margin-bottom:.5em}
+.panel h2 small{font-weight:400;color:var(--muted);font-size:.7em;margin-left:.6em}
+.scroll{flex:1;min-height:0;overflow:auto;scrollbar-width:auto}
+table{border-collapse:separate;border-spacing:0;width:100%}
+th{position:sticky;top:0;background:var(--panel);z-index:2;text-align:left;font-weight:600;color:var(--muted);
+   font-size:.85em;padding:.3em .4em;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:.35em .4em;border-bottom:1px solid var(--line);vertical-align:top}
+tr.pairstart td{border-top:2px solid var(--line)}
+.st{font-weight:700;white-space:nowrap}
+.st.Дефицит{color:var(--red)} .st.Нет{color:var(--red)} .st.Риск,.st.За{color:var(--amber)}
+.st.Остаток{color:var(--over)} .st.ОК{color:var(--ok)}
+.code{font-weight:700;white-space:nowrap}
+.role{color:var(--muted);font-size:.85em}
+.why{color:var(--muted);font-size:.88em;max-width:34em}
+.miss{color:var(--amber);font-weight:600}
+.num{text-align:right;white-space:nowrap}
+.bar{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:1px;min-width:18em;height:1.3em}
+.bar i{display:block;background:var(--grey1)}
+.bar i.d{background:var(--ok1)} .bar i.dl{background:var(--over)} .bar i.neg{background:var(--red)}
+.bar i.f{background:var(--amber1)} .bar i.fneg{background:var(--amber)} .bar i.s{outline:2px solid var(--ink);outline-offset:-2px}
+.legend{color:var(--muted);font-size:.85em;margin-top:.4em;display:flex;gap:1.2em;flex-wrap:wrap}
+.legend b{display:inline-block;width:1em;height:.9em;vertical-align:-.1em;margin-right:.3em}
+#err{position:fixed;left:1.4vw;bottom:1.2vh;background:var(--red);color:#fff;padding:.5em .9em;font-weight:600;display:none}
+#setup{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center}
+#setup form{background:var(--panel);padding:1.5em;display:grid;gap:.7em;min-width:22em}
+#setup input,#setup button{font:inherit;padding:.5em}
+@media (max-width:1100px){.strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:950px),(max-height:700px){.wall{height:auto}.scroll{overflow:visible}}
+</style>
+</head>
+<body>
+<div class="wall">
+  <header>
+    <h1>Переключения <span class="zh" lang="zh">切换监控</span></h1>
+    <div class="win" id="win"></div>
+    <div class="right"><div class="clock" id="clock"></div><div class="upd" id="upd"></div></div>
+  </header>
+  <div class="strip" id="strip"></div>
+  <section class="panel">
+    <h2>Пары старый → новый <small id="sub"></small></h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Статус</th><th>Код</th><th>Модель · граница · начало</th><th>Поставщик · ответственный</th>
+        <th class="num">Остаток сегодня</th><th class="num">Потребн. мес.</th><th class="num">Поставки (график)</th>
+        <th>Месяц по дням</th><th>Почему</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <div class="legend"><span><b style="background:var(--ok1)"></b>хватает</span><span><b style="background:var(--over)"></b>поставка по графику/заказу</span>
+      <span><b style="background:var(--red)"></b>нехватка</span><span><b style="background:var(--amber1)"></b>за графиком — план MRP</span>
+      <span><b style="background:var(--amber)"></b>нехватка за графиком</span><span><b style="outline:2px solid var(--ink)"></b>начало переключения</span></div>
+  </section>
+</div>
+<div id="err"></div>
+<div id="setup"><form id="setupForm"><b>Доступ к GitHub</b>
+  <input id="fRepo" placeholder="владелец/репозиторий"><input id="fToken" placeholder="токен (чтение)" type="password">
+  <button>Сохранить</button></form></div>
+<script>
+var INLINE = /*__SWITCH_DATA__*/null;
+(function(){
+var Q = new URLSearchParams(location.search);
+if (Q.get('dark') === '1') document.documentElement.setAttribute('data-theme', 'dark');
+var MIN = Math.max(1, parseInt(Q.get('min') || '5', 10) || 5);
+function $(id){ return document.getElementById(id) }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] }) }
+function ls(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v) } catch (e) { return null } }
+function fmt(n){ return n == null ? '—' : Math.round(n).toLocaleString('ru-RU') }
+function dm(iso){ return iso ? iso.slice(8,10) + '.' + iso.slice(5,7) : '—' }
+function tick(){ var d = new Date(); $('clock').textContent = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') }
+tick(); setInterval(tick, 15000);
+function showErr(m){ var e = $('err'); e.textContent = m; e.style.display = m ? 'block' : 'none' }
+function kpi(cls, t, v, n){ return '<div class="k ' + cls + '"><div class="t">' + t + '</div><div class="v">' + v + '</div><div class="n">' + n + '</div></div>' }
+function bar(it){
+  return '<div class="bar">' + (it.series || []).map(function(p){
+    var c = p.end < 0 ? (p.f ? 'fneg' : 'neg') : (p.del > 0 && !p.f ? 'dl' : (p.f ? 'f' : (p.dem > 0 ? 'd' : '')));
+    if (it.start === p.d) c += ' s';
+    return '<i class="' + c + '" title="' + dm(p.d) + ': потребн. ' + fmt(p.dem) + ', поставка ' + fmt(p.del) +
+      (p.f ? ' (план MRP)' : '') + ', остаток вечер ' + fmt(p.end) + '"></i>';
+  }).join('') + '</div>';
+}
+var last = null;
+function render(s){
+  last = s;
+  var k = s.kpi || {};
+  $('win').innerHTML = 'горизонт ' + dm(s.today) + '–' + dm(s.win_end) + ' · расчёт переключений от ' + esc((s.report_time || '').replace('T', ' ')) +
+    (s.graphs_read ? '' : ' · <span class="miss">графики не читались</span>');
+  $('upd').textContent = 'данные от ' + (s.generated || '').replace('T', ' ').slice(0, 16);
+  $('strip').innerHTML =
+    kpi('', 'Переключений', fmt(k.pairs), 'кодов ' + fmt(k.codes) + ' · стартуют в горизонте ' + fmt(k.starts_in_window)) +
+    kpi(k.deficit ? 'red' : '', 'Дефицит', fmt(k.deficit), k.first_deficit ? 'первый ' + dm(k.first_deficit) : 'нет в горизонте графиков') +
+    kpi(k.no_supply ? 'red' : '', 'Нет поставок', fmt(k.no_supply), 'новый код не найден в графиках/заказах') +
+    kpi(k.beyond_graph ? 'amber' : '', 'За графиком', fmt(k.beyond_graph || 0), 'нехватка после конца графика (по плану MRP)') +
+    kpi(k.old_left ? 'blue' : '', 'Остаток старого', fmt(k.old_left), 'останется после переключения — риск списания') +
+    kpi(k.no_supplier ? 'amber' : '', 'Без поставщика', fmt(k.no_supplier), 'нет в базе MRP') +
+    kpi(k.no_owner ? 'amber' : '', 'Без ответственного', fmt(k.no_owner), 'нет в китайском файле / мини-BOM');
+  $('sub').textContent = 'сначала проблемные; день — клетка, наведите для чисел';
+  var prev = null;
+  $('rows').innerHTML = (s.items || []).map(function(it){
+    var pair = it.pair || it.code, first = pair !== prev; prev = pair;
+    var st = it.status || '';
+    return '<tr' + (first ? ' class="pairstart"' : '') + '><td class="st ' + esc(st.split(' ')[0]) + '">' + esc(st) + '</td>' +
+      '<td><div class="code">' + esc(it.code) + '</div><div class="role">' + esc(it.role) + ' · ' + esc(it.name).slice(0, 40) + '</div></td>' +
+      '<td>' + esc(it.model) + ' · ' + esc(it.border || '—') + '<br>' + dm(it.start) + '</td>' +
+      '<td>' + (it.supplier && it.supplier !== 'нет в базе' ? esc(it.supplier) : '<span class="miss">нет поставщика</span>') + '<br>' +
+        (it.owner ? esc(it.owner) : '<span class="miss">нет ответственного</span>') + '</td>' +
+      '<td class="num">' + fmt(it.opening) + '</td><td class="num">' + fmt(it.demand) + '</td>' +
+      '<td class="num">' + fmt(it.deliveries) + (it.graph_end ? '<div class="role">до ' + dm(it.graph_end) + '</div>' : '') + '</td>' +
+      '<td>' + bar(it) + '</td><td class="why">' + (it.reasons || []).map(esc).join('<br>') + '</td></tr>';
+  }).join('');
+}
+if (INLINE) { render(INLINE); setTimeout(function(){ location.reload() }, MIN * 60000); return; }
+var repo = ls('mrp_repo') || '', token = ls('mrp_token') || '';
+function load(){
+  fetch('https://api.github.com/repos/' + repo + '/contents/summary_switch.json?ref=risk', {
+    headers: {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.raw'}, cache: 'no-store'
+  }).then(function(r){
+    if (r.status === 401 || r.status === 403) throw new Error('токен не подходит — откройте монитор с ?setup=1');
+    if (r.status === 404) throw new Error('монитор переключений ещё не публиковался в ветку risk');
+    if (!r.ok) throw new Error('GitHub ответил ' + r.status);
+    return r.json();
+  }).then(function(s){ showErr(''); render(s) }).catch(function(e){
+    if (last) render(last);
+    showErr('Не удалось обновить: ' + e.message + (last ? ' — показаны прежние данные' : ''));
+  });
+}
+if (!repo || !token || Q.get('setup') === '1') {
+  $('setup').style.display = 'flex';
+  $('fRepo').value = repo || 'slavakam-source/MRP'; $('fToken').value = token;
+  $('setupForm').addEventListener('submit', function(ev){
+    ev.preventDefault(); repo = $('fRepo').value.trim(); token = $('fToken').value.trim();
+    if (!repo || !token) return;
+    ls('mrp_repo', repo); ls('mrp_token', token); $('setup').style.display = 'none';
+    load(); setInterval(load, MIN * 60000);
+  });
+} else { load(); setInterval(load, MIN * 60000); }
+})();
+/* auto-scroll: медленная прокрутка окон, где позиции не помещаются (12.11.2026).
+   ?scroll=0 — выключить, ?speed=пикс/с (по умолчанию 18). Пауза 4 с наверху и внизу,
+   под мышью / касанием окно не прокручивается. */
+(function(){
+  var Q = new URLSearchParams(location.search);
+  if (Q.get('scroll') === '0') return;
+  var SPEED = Math.max(4, parseFloat(Q.get('speed') || '18') || 18), PAUSE = 4000;
+  var SEL = '.scroll,.list,.heat-scroll,.alerts';
+  var state = new WeakMap(), lastT = performance.now();
+  function st(el){
+    var s = state.get(el);
+    if (!s) {
+      s = {pos: el.scrollTop, wait: performance.now() + PAUSE, hold: false};
+      el.addEventListener('mouseenter', function(){ s.hold = true });
+      el.addEventListener('mouseleave', function(){ s.hold = false; s.pos = el.scrollTop; s.wait = performance.now() + PAUSE });
+      el.addEventListener('touchstart', function(){ s.hold = true; s.wait = performance.now() + 15000 }, {passive: true});
+      el.addEventListener('touchend', function(){ s.hold = false; s.pos = el.scrollTop }, {passive: true});
+      el.addEventListener('wheel', function(){ s.pos = el.scrollTop; s.wait = performance.now() + 10000 }, {passive: true});
+      state.set(el, s);
+    }
+    return s;
+  }
+  function frame(t){
+    var dt = Math.min(100, t - lastT); lastT = t;
+    document.querySelectorAll(SEL).forEach(function(el){
+      var max = el.scrollHeight - el.clientHeight;
+      if (max <= 4) return;
+      var s = st(el);
+      if (s.hold || t < s.wait) return;
+      if (Math.abs(el.scrollTop - s.pos) > 2) s.pos = el.scrollTop;   // окно перерисовали — продолжить с места
+      s.pos += SPEED * dt / 1000;
+      if (s.pos >= max) { s.pos = max; el.scrollTop = max; s.wait = t + PAUSE; s.back = true; return; }
+      el.scrollTop = s.pos;
+    });
+    document.querySelectorAll(SEL).forEach(function(el){
+      var s = state.get(el);
+      if (s && s.back && t >= s.wait) { s.back = false; s.pos = 0; el.scrollTop = 0; s.wait = t + PAUSE }
+    });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
