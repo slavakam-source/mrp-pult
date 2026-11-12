@@ -575,7 +575,8 @@ function loadBranchInfo(id,ref,title,stale,none){
     var m=JSON.parse(t),n=Object.keys(m.files||{}).length,u=(m.updated||'').replace('T',' ').slice(0,16);
     var d=u?new Date(u.replace(' ','T')):null,age=d?Math.round((Date.now()-d.getTime())/3600000):null;
     el.textContent=title+': '+n+' файл(ов), обновлены '+(u?u.slice(8,10)+'.'+u.slice(5,7)+' '+u.slice(11):'—')+
-      (stale&&age!==null&&age>stale?' — давно не обновлялись, проверьте рабочий ПК':'');
+      (stale&&age!==null&&age>stale?' — давно не обновлялись, проверьте рабочий ПК':'')+
+      (Array.isArray(m.sync_errors)&&m.sync_errors.length?' — сбой часовой выгрузки: '+m.sync_errors.join(', '):'');
   }).catch(function(e){el.textContent=e.status===404?none:title+': не удалось проверить ('+e.message+')'});
 }
 function loadRisk(){
