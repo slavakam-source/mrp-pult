@@ -200,6 +200,11 @@ function render(s){
   var k = s.kpi || {};
   $('win').innerHTML = 'окно ' + dm(s.calc) + '–' + dm(s.win_end) + (s.mrp_date && s.mrp_date !== s.calc ? ', расчёт MRP от ' + dm(s.mrp_date) : '') +
     '<br><span class="zh" lang="zh">窗口期 ' + dm(s.calc) + '–' + dm(s.win_end) + (s.mrp_date && s.mrp_date !== s.calc ? '，MRP计算 ' + dm(s.mrp_date) : '') + '</span>';
+  var reportSource = s.source === 'github-schedule' ? 'GitHub по расписанию' :
+    /^(pc-local|pc-manual|pc-automatic)$/.test(s.source || '') ? 'Рабочий ПК' : 'Источник не указан';
+  var reportCommit = s.code_commit || s.code_version || '';
+  $('win').innerHTML += '<br><small title="' + esc(reportCommit) + '">' + esc(reportSource +
+    (reportCommit ? ' · версия ' + String(reportCommit).slice(0, 12) : ' · версия не указана')) + '</small>';
   var g = (s.generated || '').replace('T', ' ');
   var ageH = g ? (Date.now() - new Date(g.replace(' ', 'T')).getTime()) / 3600000 : null;
   var upd = $('upd');
