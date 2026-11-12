@@ -199,14 +199,11 @@ if (!repo || !token || Q.get('setup') === '1') {
       if (max <= 4) return;
       var s = st(el);
       if (s.hold || t < s.wait) return;
+      if (s.back) { s.back = false; s.pos = 0; el.scrollTop = 0; s.wait = t + PAUSE; return; }   // по кругу: снова сверху
       if (Math.abs(el.scrollTop - s.pos) > 2) s.pos = el.scrollTop;   // окно перерисовали — продолжить с места
       s.pos += SPEED * dt / 1000;
       if (s.pos >= max) { s.pos = max; el.scrollTop = max; s.wait = t + PAUSE; s.back = true; return; }
       el.scrollTop = s.pos;
-    });
-    document.querySelectorAll(SEL).forEach(function(el){
-      var s = state.get(el);
-      if (s && s.back && t >= s.wait) { s.back = false; s.pos = 0; el.scrollTop = 0; s.wait = t + PAUSE }
     });
     requestAnimationFrame(frame);
   }
