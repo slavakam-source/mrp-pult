@@ -51,6 +51,10 @@ tr.pairstart td{border-top:2px solid var(--line)}
 .role{color:var(--muted);font-size:.85em}
 .why{color:var(--muted);font-size:.88em;max-width:34em}
 .miss{color:var(--amber);font-weight:600}
+.sup{display:inline-block;font-weight:800;font-size:1.12em;padding:.12em .55em;border-radius:.35em;background:var(--sc,#16233B);color:#fff;white-space:nowrap;letter-spacing:.01em}
+.sup.none{background:var(--amber1);color:var(--amber)}
+.own{margin-top:.25em;font-weight:600}
+.own small{display:block;color:var(--muted);font-weight:400;font-size:.8em}
 .num{text-align:right;white-space:nowrap}
 .bar{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:1px;min-width:18em;height:1.3em}
 .bar i{display:block;background:var(--grey1)}
@@ -77,7 +81,7 @@ tr.pairstart td{border-top:2px solid var(--line)}
   <section class="panel">
     <h2>Пары старый → новый <small id="sub"></small></h2>
     <div class="scroll"><table>
-      <thead><tr><th>Статус</th><th>Код</th><th>Модель · граница · начало</th><th>Поставщик · ответственный</th>
+      <thead><tr><th>Статус</th><th>Поставщик · ответственный</th><th>Код</th><th>Модель · граница · начало</th>
         <th class="num">Остаток сегодня</th><th class="num">Потребн. мес.</th><th class="num">Поставки (график)</th>
         <th>Месяц по дням</th><th>Почему</th></tr></thead>
       <tbody id="rows"></tbody>
@@ -114,6 +118,13 @@ function bar(it){
       (p.f ? ' (план MRP)' : '') + ', остаток вечер ' + fmt(p.end) + '"></i>';
   }).join('') + '</div>';
 }
+var PALETTE = ['#1F4E9C','#0E7C66','#8A3FA0','#B4531B','#2F6F9F','#7A5C00','#A3264A','#3E6B2A','#5B4BB7','#00707F','#9C3D7A','#4D5D75'];
+function supColor(name){ var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0; return PALETTE[h % PALETTE.length] }
+function supCell(it){
+  var sup = it.supplier && it.supplier !== 'нет в базе' ? it.supplier : '';
+  return '<td>' + (sup ? '<span class="sup" style="--sc:' + supColor(sup) + '">' + esc(sup) + '</span>' : '<span class="sup none">нет поставщика</span>') +
+    '<div class="own">' + (it.owner ? esc(it.owner) : '<span class="miss">нет ответственного</span>') + '</div></td>';
+}
 var last = null;
 function render(s){
   last = s;
@@ -128,17 +139,15 @@ function render(s){
     kpi(k.beyond_graph ? 'amber' : '', 'За графиком', fmt(k.beyond_graph || 0), 'нехватка после конца графика (по плану MRP)') +
     kpi(k.old_left ? 'blue' : '', 'Остаток старого', fmt(k.old_left), 'останется после переключения — риск списания') +
     kpi(k.no_supplier ? 'amber' : '', 'Без поставщика', fmt(k.no_supplier), 'нет в базе MRP') +
-    kpi(k.no_owner ? 'amber' : '', 'Без ответственного', fmt(k.no_owner), 'нет в китайском файле / мини-BOM');
+    kpi(k.no_owner ? 'amber' : '', 'Без ответственного', fmt(k.no_owner), 'нет в колонке «Специалист» китайского файла');
   $('sub').textContent = 'сначала проблемные; день — клетка, наведите для чисел';
   var prev = null;
   $('rows').innerHTML = (s.items || []).map(function(it){
     var pair = it.pair || it.code, first = pair !== prev; prev = pair;
     var st = it.status || '';
     return '<tr' + (first ? ' class="pairstart"' : '') + '><td class="st ' + esc(st.split(' ')[0]) + '">' + esc(st) + '</td>' +
-      '<td><div class="code">' + esc(it.code) + '</div><div class="role">' + esc(it.role) + ' · ' + esc(it.name).slice(0, 40) + '</div></td>' +
+      supCell(it) + '<td><div class="code">' + esc(it.code) + '</div><div class="role">' + esc(it.role) + ' · ' + esc(it.name).slice(0, 40) + '</div></td>' +
       '<td>' + esc(it.model) + ' · ' + esc(it.border || '—') + '<br>' + dm(it.start) + '</td>' +
-      '<td>' + (it.supplier && it.supplier !== 'нет в базе' ? esc(it.supplier) : '<span class="miss">нет поставщика</span>') + '<br>' +
-        (it.owner ? esc(it.owner) : '<span class="miss">нет ответственного</span>') + '</td>' +
       '<td class="num">' + fmt(it.opening) + '</td><td class="num">' + fmt(it.demand) + '</td>' +
       '<td class="num">' + fmt(it.deliveries) + (it.graph_end ? '<div class="role">до ' + dm(it.graph_end) + '</div>' : '') + '</td>' +
       '<td>' + bar(it) + '</td><td class="why">' + (it.reasons || []).map(esc).join('<br>') + '</td></tr>';
